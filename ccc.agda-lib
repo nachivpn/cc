@@ -1,0 +1,6 @@
+name: ccc
+depend:
+  standard-library
+  agda-categories
+include :
+  src
