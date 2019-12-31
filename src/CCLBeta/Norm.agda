@@ -1,11 +1,18 @@
-module ExpElim.Norm where
+module CCLBeta.Norm where
 
-open import Data.Unit using (⊤ ; tt)
-open import Data.Empty using (⊥)
-open import Data.Product using (_×_ ; _,_ ; proj₁ ; proj₂) public
+open import Data.Unit
+  using (⊤ ; tt)
+open import Data.Empty
+  using (⊥)
+open import Data.Product
+  using (∃ ; ∃₂ ; Σ ; _×_ ; _,_ ; proj₁ ; proj₂)
+open import Relation.Nullary
+  using (¬_)
 open import Data.Sum
-open import Relation.Binary.PropositionalEquality using (_≡_ ; refl)
+  using (_⊎_ ; inj₁ ; inj₂)
 
+open import Relation.Binary.PropositionalEquality
+  using (_≡_ ; refl)
 open import Relation.Binary.Construct.Closure.ReflexiveTransitive
   using (Star)
   renaming (_◅◅_ to trans)
@@ -68,8 +75,8 @@ data _⟶_ : Tm a b → Tm a b → Set where
     → curry f ∙ h ⟶ curry (f ∙ (h ⊗ id))
 
   -- "surjective pairing" restricted to application site
-  exp-apply :
-      apply {a} {b} ⟶ apply ∙ pair fst snd
+  exp-apply∙ : {u : Tm a ((b ⇒ c) * b)}
+    → apply ∙ u ⟶ apply ∙ pair (fst ∙ u) (snd ∙ u)
 
   -- congruence rules
   cong-pair1 : {f f' : Tm a b} {g : Tm a c}
@@ -78,12 +85,15 @@ data _⟶_ : Tm a b → Tm a b → Set where
   cong-pair2 : {f : Tm a b} {g g' : Tm a c}
     → g ⟶ g'
     → (pair f g) ⟶ (pair f g')
+
   cong-∙1 : {f f' : Tm b c} {g : Tm a b}
     → f ⟶ f'
     → f ∙ g ⟶ f' ∙ g
+
   cong-∙2 : {f : Tm b c} {g g' : Tm a b}
     → g ⟶ g'
     → f ∙ g ⟶ f ∙ g'
+
 
 -- multi-step reduction
 _⟶*_ : Tm a b → Tm a b → Set
@@ -135,6 +145,8 @@ data Ne where
   -- contract of `curry (apply)`
   id⇒      : Ne (a ⇒ b) (a ⇒ b)
 
+  --
+  apply    : Ne ((a ⇒ b) * a) b
   -- ≡ apply ∙ pair n m
   app∙pair : Ne a (b ⇒ c) → Nf a b → Ne a c
 
@@ -144,6 +156,7 @@ embNe (app∙pair t u) = apply ∙ pair (embNe t) (embNf u)
 embNe fst        = fst
 embNe snd        = snd
 embNe id⇒        = id
+embNe apply      = apply
 
 data Nf where
 
@@ -247,7 +260,7 @@ pair' x y = (pair (reify x) (reify y)) , x , y
 
 -- semantic application
 apply' : Sem ((a ⇒ b) * a) b
-apply' = reflect (app∙pair fst (up snd))
+apply' = reflect apply
 
 -- normal identity
 idn : Nf a a
@@ -317,19 +330,12 @@ R-chain {b = b * c} g⟶*f (f⟶*x , sc1 , sc2)
   , R-chain (cong-∙ refl g⟶*f) sc1
   , R-chain (cong-∙ refl g⟶*f) sc2
 
--- expand term which produces application pair
-exp-app∙ : {u : Tm a ((b ⇒ c) * b)}
-  → apply ∙ u ⟶* apply ∙ pair (fst ∙ u) (snd ∙ u)
-exp-app∙ = trans
-  (cong-∙ (lift exp-apply) refl)
-  (trans (lift assoc) (lift (cong-∙2 comp-pair)))
-
 -- trace application composition
 R-apply∙ : {u : Tm e ((a ⇒ b) * a)} {v : Sem e ((a ⇒ b) * a)}
   → R u v
   → R (apply ∙ u) (apply∙' v)
 R-apply∙ (p , (q , ss) , r) =
-  R-chain exp-app∙ (ss r)
+  R-chain (lift exp-apply∙) (ss r)
 
 -- lemma for (a kind of) beta-reduction
 beta-lemma :
@@ -474,8 +480,65 @@ fund (curry t) = refl , (λ {u = u} {v} uRv
       (fund∙ t (cong-pair id⟶*idn (R-reduces uRv)
       , R-chain (lift red-fst) R-id
       , R-chain (lift red-snd) uRv)))
-fund apply = R-chain (lift exp-apply) (R-reflect (app∙pair fst (up snd)))
+fund apply = R-reflect apply
 
 -- trace normalization
 trace : (t : Tm a b) → t ⟶* norm t
 trace t = R-reduces (fund t)
+
+-- Defn.: "a term doesn't reduce"
+DoesntRed : Tm a b → Set
+DoesntRed {a} {b} t = {t' : Tm a b} → ¬ (t ⟶ t')
+
+-- Defn.: weak normalization
+WeakNorm : Tm a b → Set
+WeakNorm t = ∃ λ t' → (t ⟶* t') × DoesntRed t'
+
+-- a neutral element doesn't reduce further
+neDoesntRed : (n : Ne a b) → DoesntRed (embNe n)
+-- a normal form doesn't reduce further
+nfDoesntRed : (n : Nf a b) → DoesntRed (embNf n)
+
+neDoesntRed fst = λ ()
+neDoesntRed snd = λ ()
+neDoesntRed (fst∙ n) = fst∙Lemma n (neDoesntRed n)
+  where
+  fst∙Lemma : (n : Ne a (b * c))
+    → DoesntRed (embNe n)
+    → DoesntRed (fst ∙ embNe n)
+  fst∙Lemma fst f (cong-∙2 r) = f r
+  fst∙Lemma snd f (cong-∙2 r) = f r
+  fst∙Lemma (fst∙ n) f (cong-∙2 r) = f r
+  fst∙Lemma (snd∙ n) f (cong-∙2 r) = f r
+  fst∙Lemma apply f (cong-∙2 ())
+  fst∙Lemma (app∙pair n x) f r = f exp-apply∙
+neDoesntRed (snd∙ n) = snd∙Lemma n (neDoesntRed n)
+  where
+  snd∙Lemma : (n : Ne a (b * c))
+    → DoesntRed (embNe n)
+    → DoesntRed (snd ∙ embNe n)
+  snd∙Lemma fst f (cong-∙2 r) = f r
+  snd∙Lemma snd f (cong-∙2 r) = f r
+  snd∙Lemma (fst∙ n) f (cong-∙2 r) = f r
+  snd∙Lemma (snd∙ n) f (cong-∙2 r) = f r
+  snd∙Lemma apply f (cong-∙2 r) = f r
+  snd∙Lemma (app∙pair n x) f r = f exp-apply∙
+neDoesntRed id⇒ = λ ()
+neDoesntRed (app∙pair n x) = app∙pairLemma n x (neDoesntRed n)
+  where
+  app∙pairLemma : (n : Ne a (b ⇒ c)) (m : Nf a b)
+    → DoesntRed (embNe n)
+    → DoesntRed (apply ∙ pair (embNe n) (embNf m))
+  app∙pairLemma n m f r = {!!}
+  -- seems like we need to know that exp-apply∙ can't be applied forever
+  -- which it can be now!
+
+nfDoesntRed (up x) = neDoesntRed x
+nfDoesntRed id𝕓 = λ ()
+nfDoesntRed id𝟙 = λ ()
+nfDoesntRed id* = λ ()
+nfDoesntRed unit = λ ()
+nfDoesntRed (pair m n) = λ {
+  (cong-pair1 x) → nfDoesntRed m x ;
+  (cong-pair2 x) → nfDoesntRed n x }
+nfDoesntRed (curry x) = λ ()
