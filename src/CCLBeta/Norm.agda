@@ -15,7 +15,6 @@ open import Relation.Binary.Construct.Closure.ReflexiveTransitive
 
 open Star renaming (ε to refl)
 
-
 infixr 5 _⇒_
 
 data Ty : Set where
@@ -90,6 +89,8 @@ data _⟶_ : Tm a b → Tm a b → Set where
     → g ⟶ g'
     → f ∙ g ⟶ f ∙ g'
 
+  -- NOTE: there is no congruence rule for curry
+  -- since we want weak-head normal forms for functions
 
 -- multi-step reduction
 _⟶*_ : Tm a b → Tm a b → Set
@@ -128,7 +129,7 @@ embNf : Nf a b → Tm a b
 
 data Ne where
 
-  -- projections
+  -- fst , snd
   fst      : Ne (a * b) a
   snd      : Ne (a * b) b
 
@@ -141,18 +142,19 @@ data Ne where
   -- contract of `curry (apply)`
   id⇒      : Ne (a ⇒ b) (a ⇒ b)
 
-  --
+  -- apply
   apply    : Ne ((a ⇒ b) * a) b
-  -- ≡ apply ∙ pair n m
+
+  -- apply ∙ pair n m
   app∙pair : Ne a (b ⇒ c) → Nf a b → Ne a c
 
-embNe (fst∙ t)   = fst ∙ embNe t
-embNe (snd∙ t)   = snd ∙ embNe t
+embNe fst            = fst
+embNe snd            = snd
+embNe (fst∙ t)       = fst ∙ embNe t
+embNe (snd∙ t)       = snd ∙ embNe t
+embNe id⇒            = id
+embNe apply          = apply
 embNe (app∙pair t u) = apply ∙ pair (embNe t) (embNf u)
-embNe fst        = fst
-embNe snd        = snd
-embNe id⇒        = id
-embNe apply      = apply
 
 data Nf where
 
@@ -173,20 +175,40 @@ data Nf where
   pair  : Nf a b → Nf a c → Nf a (b * c)
   curry : Tm (a * b) c → Nf a (b ⇒ c)
 
-embNf (up x)   = embNe x
+embNf (up x)     = embNe x
+embNf id𝕓        = id
+embNf id𝟙        = id
+embNf id*        = id
 embNf unit       = unit
 embNf (pair m n) = pair (embNf m) (embNf n)
 embNf (curry t)  = curry t
-embNf id𝕓 = id
-embNf id𝟙 = id
-embNf id* = id
 
 -- interpretation of types
 Sem : Ty → Ty → Set
-Sem a 𝕓       = Nf a 𝕓
-Sem a 𝟙       = Nf a 𝟙
-Sem a (b ⇒ c) = Nf a (b ⇒ c) × (Sem a b → Sem a c)
+Sem a 𝕓       = Nf a 𝕓 -- see Note 1
+Sem a 𝟙       = Nf a 𝟙 -- see Note 2
+Sem a (b ⇒ c) = Nf a (b ⇒ c) × (Sem a b → Sem a c) -- see Notes 3 and 4
 Sem a (b * c) = Nf a (b * c) × (Sem a b × Sem a c)
+
+----
+-- Notes on interpretation:
+--
+-- 1. (𝕓) We interpret 𝕓 as `Nf a 𝕓` instead of `Ne a b` to preserve `id {𝕓}`
+--
+-- 2. (𝟙) For the same reason as 1, we interpret 𝟙 as `Nf a 𝟙` instead of ⊤
+--
+-- 3. (⇒) Changing the first component of interpretation to Tm (a * b) c
+-- would force all functions to be constructed by `curry`.
+-- A notable consequence of this is that it would require
+-- identities to be expanded to `curry apply`---which requires
+-- an additional (eta-)rule: `id {_⇒_} ⟶ curry (apply)`
+--
+-- 4. (⇒) Changing the normal form constructor `curry` to accept
+-- a normal form argument (instead of a term) would force
+-- full-beta reduction. This also demands a richer interpretation:
+-- the second component of interpretation must support weakening (I think)
+--
+----
 
 reify : Sem e a → Nf e a
 reify {a = 𝕓}     x       = x
@@ -330,8 +352,8 @@ R-chain {b = b * c} g⟶*f (f⟶*x , sc1 , sc2)
 R-apply∙ : {u : Tm e ((a ⇒ b) * a)} {v : Sem e ((a ⇒ b) * a)}
   → R u v
   → R (apply ∙ u) (apply∙' v)
-R-apply∙ (p , (q , ss) , r) =
-  R-chain (lift exp-apply∙) (ss r)
+R-apply∙ (p , (q , ss) , r)
+  = R-chain (lift exp-apply∙) (ss r)
 
 -- lemma for reducing function application
 beta-lemma :
