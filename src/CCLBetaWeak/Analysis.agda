@@ -1,4 +1,4 @@
-module CCLBeta.Analysis where
+module CCLBetaWeak.Analysis where
 
 open import Data.Unit
   using (⊤ ; tt)
@@ -9,7 +9,7 @@ open import Relation.Nullary
 open import Data.Product
   using (Σ ; _×_ ; _,_ ; proj₁ ; proj₂)
 
-open import CCLBeta.Norm
+open import CCLBetaWeak.Norm
 
 -- defn.: "beta rules" (all but the expansive exp-apply∙ rule)
 BetaRule : {t t' : Tm a b} → t ⟶ t' → Set

@@ -1,4 +1,4 @@
-module CCLBeta.Norm where
+module CCLBetaWeak.Norm where
 
 open import Data.Unit
   using (⊤ ; tt)

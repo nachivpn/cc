@@ -1,6 +1,6 @@
-module CCLBeta.Examples where
+module CCLBetaWeak.Examples where
 
-open import CCLBeta.Norm
+open import CCLBetaWeak.Norm
 open import Relation.Binary.Construct.Closure.ReflexiveTransitive
   using (Star)
   renaming (_◅◅_ to trans)
