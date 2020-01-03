@@ -1,4 +1,4 @@
-name: ccc
+name: cc
 depend:
   standard-library
   agda-categories
