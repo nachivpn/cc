@@ -121,7 +121,9 @@ _ : norm {(𝕓 ⇒ 𝕓) * 𝕓}
          (apply ∙ id) ≡ (apply ∙ pair fst snd)
 _ = refl
 
-
 _ : norm {((𝕓 ⇒ 𝕓) * 𝕓) * a}
          (apply ∙ fst) ≡ (apply ∙ pair (fst ∙ fst) (snd ∙ fst))
 _ = refl
+
+-- Q: Do we really need expansion by `exp-apply∙` for normalization? Why?
+-- Or is it just the trace builder inducing this need?

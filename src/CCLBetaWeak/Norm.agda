@@ -183,6 +183,13 @@ embNf unit       = unit
 embNf (pair m n) = pair (embNf m) (embNf n)
 embNf (curry t)  = curry t
 
+-- normal identity
+idn : Nf a a
+idn {𝕓}     = id𝕓
+idn {𝟙}     = id𝟙
+idn {a ⇒ b} = up id⇒
+idn {a * b} = id*
+
 -- interpretation of types
 Sem : Ty → Ty → Set
 Sem a 𝕓       = Nf a 𝕓 -- see Note 1
@@ -210,15 +217,18 @@ Sem a (b * c) = Nf a (b * c) × (Sem a b × Sem a c)
 --
 ----
 
+-- from semantics to normal forms
 reify : Sem e a → Nf e a
 reify {a = 𝕓}     x       = x
 reify {a = 𝟙}     x       = x
 reify {a = a ⇒ b} (n , _) = n
 reify {a = a * b} (n , _) = n
 
+-- from semantics to terms
 quot : Sem a b → Tm a b
 quot x = embNf (reify x)
 
+-- from neutrals to semantics (via types)
 reflect : Ne a b → Sem a b
 reflect {b = 𝕓}     t = up t
 reflect {b = 𝟙}     t = up t
@@ -248,6 +258,10 @@ snd∙' (_ , _ , x) = x
 apply∙' : Sem a ((b ⇒ c) * b) → Sem a c
 apply∙' (_ , f , x) = f ∘ x
 
+-- semantic pairing
+pair' : Sem a b → Sem a c → Sem a (b * c)
+pair' x y = pair (reify x) (reify y) , x , y
+
 -- semantic term composition
 eval∙ : Tm a b → Sem e a → Sem e b
 eval∙ id      x = x
@@ -264,40 +278,16 @@ eval∙ (curry t) x
   = curry (t ∙ quot x ⊗ id)
   , λ y → eval∙ t (pair (reify x) (reify y) , x , y)
 
--- semantic projection fst
-fst' : Sem (a * b) a
-fst' = reflect fst
-
--- semantic projection snd
-snd' : Sem (a * b) b
-snd' = reflect snd
-
--- semantic pairing
-pair' : Sem a b → Sem a c → Sem a (b * c)
-pair' x y = (pair (reify x) (reify y)) , x , y
-
--- semantic application
-apply' : Sem ((a ⇒ b) * a) b
-apply' = reflect apply
-
--- normal identity
-idn : Nf a a
-idn {𝕓} = id𝕓
-idn {𝟙} = id𝟙
-idn {a ⇒ b} = up id⇒
-idn {a * b} = id*
-
 -- interpretation of terms
-
 eval : Tm a b → Sem a b
-eval id      = id'
-eval (t ∙ u) = eval∙ t (eval u)
-eval fst     = fst'
-eval snd     = snd'
-eval unit    = unit
-eval apply   = apply'
+eval id         = id'
+eval (t ∙ u)    = eval∙ t (eval u)
+eval fst        = reflect fst
+eval snd        = reflect snd
+eval unit       = unit
+eval apply      = reflect apply
 eval (pair t u) = pair' (eval t) (eval u)
-eval (curry t) = (curry t) , λ x → eval∙ t (pair idn (reify x) , id' , x)
+eval (curry t)  = (curry t) , λ x → eval∙ t (pair idn (reify x) , id' , x)
 
 -- normalization function
 norm : Tm a b → Tm a b
@@ -447,32 +437,6 @@ id⟶*idn {𝟙} = refl
 id⟶*idn {a ⇒ b} = refl
 id⟶*idn {a * b} = refl
 
--- trace projection fst
-R-fst : R {a * b} fst fst'
-R-fst {𝕓} = refl
-R-fst {𝟙} = refl
-R-fst {a ⇒ b} = refl , λ {u = u} {v} uRv
-  → R-chain
-      (cong-∙ refl (cong-pair refl (R-reduces uRv)))
-      (R-reflect (app∙pair fst (reify v)))
-R-fst {a * b}
-  = refl
-  , R-reflect (fst∙ fst)
-  , R-reflect (snd∙ fst)
-
--- trace projection snd
-R-snd : R {a * b} snd snd'
-R-snd {b = 𝕓} = refl
-R-snd {b = 𝟙} = refl
-R-snd {b = a ⇒ b} = refl , λ {u = u} {v} uRv
-  → R-chain
-      (cong-∙ refl (cong-pair refl (R-reduces uRv)))
-      (R-reflect (app∙pair snd (reify v)))
-R-snd {b = a * b}
-  = refl
-  , R-reflect (fst∙ snd)
-  , R-reflect (snd∙ snd)
-
 -- trace pairing
 R-pair : {t : Tm a b} {x : Sem a b}
   {u : Tm a c} {y : Sem a c}
@@ -488,8 +452,8 @@ R-pair tRx uRy
 fund : (t : Tm a b) → R t (eval t)
 fund id = R-id
 fund (t ∙ u) = fund∙ t (fund u)
-fund fst = R-fst
-fund snd = R-snd
+fund fst = R-reflect fst
+fund snd = R-reflect snd
 fund (pair t u) = R-pair (fund t) (fund u)
 fund unit = refl
 fund (curry t) = refl , (λ {u = u} {v} uRv
