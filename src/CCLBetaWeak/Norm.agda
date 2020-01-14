@@ -1,5 +1,7 @@
 module CCLBetaWeak.Norm where
 
+open import CCLBetaWeak.CCL
+
 open import Data.Unit
   using (⊤ ; tt)
 open import Data.Empty
@@ -8,180 +10,11 @@ open import Data.Product
   using (_×_ ; _,_ ; proj₁ ; proj₂)
 open import Data.Sum
   using (_⊎_ ; inj₁ ; inj₂)
-
 open import Relation.Binary.Construct.Closure.ReflexiveTransitive
   using (Star)
   renaming (_◅◅_ to trans)
 
 open Star renaming (ε to refl)
-
-infixr 5 _⇒_
-
-data Ty : Set where
-  𝕓        : Ty
-  𝟙        : Ty
-  _⇒_  _*_ : (a b : Ty) → Ty
-
-variable
-  a b c d e : Ty
-
-infixr 4 _∘_
-infixr 4 _∙_
-
-data Tm : (a b : Ty) → Set where
-  id    : Tm a a
-  _∙_   : Tm b c → Tm a b → Tm a c
-  fst   : Tm (a * b) a
-  snd   : Tm (a * b) b
-  pair  : Tm a b → Tm a c → Tm a (b * c)
-  unit  : Tm a 𝟙
-  curry : Tm (c * a) b → Tm c (a ⇒ b)
-  apply : Tm ((a ⇒ b) * a) b
-
-_⊗_ : Tm a c → Tm b d → Tm (a * b) (c * d)
-t ⊗ u = pair (t ∙ fst) (u ∙ snd)
-
-infix 3 _⟶_
-infix 3 _⟶*_
-
--- single-step reduction
-data _⟶_ : Tm a b → Tm a b → Set where
-
-  -- reduction rules
-  red-idl  : {f : Tm a b}
-    → id ∙ f ⟶ f
-  red-idr  : {f : Tm a b}
-    → f ∙ id ⟶ f
-  red-fst  : {f : Tm a b} {g : Tm a c}
-    → fst ∙ (pair f g) ⟶ f
-  red-snd  : {f : Tm a b} {g : Tm a c}
-    → snd ∙ (pair f g) ⟶ g
-  red-apply : {f : Tm (a * b) c} {g : Tm a b}
-    → apply ∙ pair (curry f) g ⟶ (f ∙ pair id g)
-  red-unit : {f : Tm a b}
-    → (unit ∙ f) ⟶ unit
-
-  -- composition rules
-  assoc : {f : Tm c d} {g : Tm b c} {h : Tm a b}
-    → (f ∙ g) ∙ h ⟶ f ∙ (g ∙ h)
-  comp-pair : {f : Tm b c} {g : Tm b d} {h : Tm a b}
-    → pair f g ∙ h ⟶ pair (f ∙ h) (g ∙ h)
-  comp-curry : {h : Tm d c} {f : Tm (c * a) b}
-    → curry f ∙ h ⟶ curry (f ∙ (h ⊗ id))
-
-  -- "surjective pairing" restricted to application site
-  exp-apply∙ : {u : Tm a ((b ⇒ c) * b)}
-    → apply ∙ u ⟶ apply ∙ pair (fst ∙ u) (snd ∙ u)
-
-  -- congruence rules
-  cong-pair1 : {f f' : Tm a b} {g : Tm a c}
-    → f ⟶ f'
-    → (pair f g) ⟶ (pair f' g)
-  cong-pair2 : {f : Tm a b} {g g' : Tm a c}
-    → g ⟶ g'
-    → (pair f g) ⟶ (pair f g')
-
-  cong-∙1 : {f f' : Tm b c} {g : Tm a b}
-    → f ⟶ f'
-    → f ∙ g ⟶ f' ∙ g
-
-  cong-∙2 : {f : Tm b c} {g g' : Tm a b}
-    → g ⟶ g'
-    → f ∙ g ⟶ f ∙ g'
-
-  -- NOTE: there is no congruence rule for curry
-  -- since we want weak-head normal forms for functions
-
--- multi-step reduction
-_⟶*_ : Tm a b → Tm a b → Set
-_⟶*_ = Star (_⟶_)
-
--- embed ⟶ to ⟶*
-lift : {t t' : Tm a b}
-  → t ⟶ t'
-  → t ⟶* t'
-lift p = p ◅ refl
-
-cong-pair : {f f' : Tm a b} {g g' : Tm a c}
-    → f ⟶* f'
-    → g ⟶* g'
-    → (pair f g) ⟶* (pair f' g')
-cong-pair refl refl = refl
-cong-pair refl (x ◅ q) = cong-pair2 x ◅ cong-pair refl q
-cong-pair (x ◅ p) q = cong-pair1 x ◅ cong-pair p q
-
-cong-∙ : {f f' : Tm b c} {g g' : Tm a b}
-  → f ⟶* f'
-  → g ⟶* g'
-  → f ∙ g ⟶* f' ∙ g'
-cong-∙ refl refl = refl
-cong-∙ refl (x ◅ q) = cong-∙2 x ◅ cong-∙ refl q
-cong-∙ (x ◅ p) q = cong-∙1 x ◅ cong-∙ p q
-
--- reflectable terms
-data Ne : Ty → Ty → Set
-
--- reifiable terms
-data Nf : Ty → Ty → Set
-
-embNe : Ne a b → Tm a b
-embNf : Nf a b → Tm a b
-
-data Ne where
-
-  -- fst , snd
-  fst      : Ne (a * b) a
-  snd      : Ne (a * b) b
-
-  -- fst ∙ n
-  fst∙     : Ne a (b * c) → Ne a b
-
-  -- snd ∙ n
-  snd∙     : Ne a (b * c) → Ne a c
-
-  -- contract of `curry (apply)`
-  id⇒      : Ne (a ⇒ b) (a ⇒ b)
-
-  -- apply
-  apply    : Ne ((a ⇒ b) * a) b
-
-  -- apply ∙ pair n m
-  app∙pair : Ne a (b ⇒ c) → Nf a b → Ne a c
-
-embNe fst            = fst
-embNe snd            = snd
-embNe (fst∙ t)       = fst ∙ embNe t
-embNe (snd∙ t)       = snd ∙ embNe t
-embNe id⇒            = id
-embNe apply          = apply
-embNe (app∙pair t u) = apply ∙ pair (embNe t) (embNf u)
-
-data Nf where
-
-  -- embed neutrals to normals
-  up    : Ne a b → Nf a b
-
-  -- canonical identity for 𝕓
-  id𝕓   : Nf 𝕓 𝕓
-
-  -- contract of unit
-  id𝟙   : Nf 𝟙 𝟙
-
-  -- contract of (pair id id)
-  id*   : Nf (a * b) (a * b)
-
-  -- value constructors
-  unit  : Nf a 𝟙
-  pair  : Nf a b → Nf a c → Nf a (b * c)
-  curry : Tm (a * b) c → Nf a (b ⇒ c)
-
-embNf (up x)     = embNe x
-embNf id𝕓        = id
-embNf id𝟙        = id
-embNf id*        = id
-embNf unit       = unit
-embNf (pair m n) = pair (embNf m) (embNf n)
-embNf (curry t)  = curry t
 
 -- normal identity
 idn : Nf a a
@@ -191,11 +24,11 @@ idn {a ⇒ b} = up id⇒
 idn {a * b} = id*
 
 -- interpretation of types
-Sem : Ty → Ty → Set
-Sem a 𝕓       = Nf a 𝕓 -- see Note 1
-Sem a 𝟙       = Nf a 𝟙 -- see Note 2
-Sem a (b ⇒ c) = Nf a (b ⇒ c) × (Sem a b → Sem a c) -- see Notes 3 and 4
-Sem a (b * c) = Nf a (b * c) × (Sem a b × Sem a c)
+Val : Ty → Ty → Set
+Val a 𝕓       = Nf a 𝕓 -- see Note 1
+Val a 𝟙       = Nf a 𝟙 -- see Note 2
+Val a (b ⇒ c) = Nf a (b ⇒ c) × (Val a b → Val a c) -- see Notes 3 and 4
+Val a (b * c) = Nf a (b * c) × (Val a b × Val a c)
 
 ----
 -- Notes on interpretation:
@@ -218,52 +51,54 @@ Sem a (b * c) = Nf a (b * c) × (Sem a b × Sem a c)
 ----
 
 -- from semantics to normal forms
-reify : Sem e a → Nf e a
+reify : Val e a → Nf e a
 reify {a = 𝕓}     x       = x
 reify {a = 𝟙}     x       = x
 reify {a = a ⇒ b} (n , _) = n
 reify {a = a * b} (n , _) = n
 
 -- from semantics to terms
-quot : Sem a b → Tm a b
+quot : Val a b → Tm a b
 quot x = embNf (reify x)
 
 -- from neutrals to semantics (via types)
-reflect : Ne a b → Sem a b
+reflect : Ne a b → Val a b
 reflect {b = 𝕓}     t = up t
 reflect {b = 𝟙}     t = up t
 reflect {b = b ⇒ c} t = up t , λ x → reflect {_} {c} (app∙pair t (reify x))
 reflect {b = b * c} t = up t , reflect (fst∙ t) , reflect (snd∙ t)
 
 -- semantic identity
-id' : Sem a a
+id' : Val a a
 id' {𝕓}     = id𝕓
 id' {𝟙}     = id𝟙
 id' {a ⇒ b} = up id⇒ , (λ x → reflect (app∙pair id⇒ (reify x)))
 id' {a * b} = id* , reflect fst , reflect snd
 
+infixr 4 _∘_
+
 -- semantic application
-_∘_ : Sem a (b ⇒ c) → Sem a b → Sem a c
+_∘_ : Val a (b ⇒ c) → Val a b → Val a c
 (_ , f) ∘ x = f x
 
 -- semantic projection fst composition
-fst∙' : Sem a (b * c) → Sem a b
+fst∙' : Val a (b * c) → Val a b
 fst∙' (_ , x , _) = x
 
 -- semantic projection snd composition
-snd∙' : Sem a (b * c) → Sem a c
+snd∙' : Val a (b * c) → Val a c
 snd∙' (_ , _ , x) = x
 
 -- semantic application composition
-apply∙' : Sem a ((b ⇒ c) * b) → Sem a c
+apply∙' : Val a ((b ⇒ c) * b) → Val a c
 apply∙' (_ , f , x) = f ∘ x
 
 -- semantic pairing
-pair' : Sem a b → Sem a c → Sem a (b * c)
+pair' : Val a b → Val a c → Val a (b * c)
 pair' x y = pair (reify x) (reify y) , x , y
 
 -- semantic term composition
-eval∙ : Tm a b → Sem e a → Sem e b
+eval∙ : Tm a b → Val e a → Val e b
 eval∙ id      x = x
 eval∙ (t ∙ u) x = eval∙ t (eval∙ u x)
 eval∙ unit    x = unit
@@ -279,7 +114,7 @@ eval∙ (curry t) x
   , λ y → eval∙ t (pair (reify x) (reify y) , x , y)
 
 -- interpretation of terms
-eval : Tm a b → Sem a b
+eval : Tm a b → Val a b
 eval id         = id'
 eval (t ∙ u)    = eval∙ t (eval u)
 eval fst        = reflect fst
@@ -298,11 +133,11 @@ norm t = quot (eval t)
 --------------------------
 
 -- trace builder
-R : Tm a b → Sem a b → Set
+R : Tm a b → Val a b → Set
 R {a} {𝕓}      t x = t ⟶* quot x
 R {a} {𝟙}      t x = t ⟶* quot x
 R {a} {b ⇒ c}  t f = t ⟶* quot f
-  × ({u : Tm a b} {u' : Sem a b}
+  × ({u : Tm a b} {u' : Val a b}
   → R u u'
   → R (apply ∙ pair t u) (apply∙' (pair' f u')))
 R {a} {b * c} t x = t ⟶* quot x
@@ -310,7 +145,7 @@ R {a} {b * c} t x = t ⟶* quot x
   × R (snd ∙ t) (snd∙' x)
 
 -- extract trace
-R-reduces : {t : Tm a b} {x : Sem a b}
+R-reduces : {t : Tm a b} {x : Val a b}
   → R t x
   → t ⟶* quot x
 R-reduces {b = 𝕓}     p = p
@@ -319,7 +154,7 @@ R-reduces {b = b ⇒ c} p = proj₁ p
 R-reduces {b = b * c} p = proj₁ p
 
 -- chain trace with a builder
-R-chain : {f g : Tm a b} {x : Sem a b}
+R-chain : {f g : Tm a b} {x : Val a b}
   → g ⟶* f
   → R f x
   → R g x
@@ -339,7 +174,7 @@ R-chain {b = b * c} g⟶*f (f⟶*x , sc1 , sc2)
   , R-chain (cong-∙ refl g⟶*f) sc2
 
 -- trace application composition
-R-apply∙ : {u : Tm e ((a ⇒ b) * a)} {v : Sem e ((a ⇒ b) * a)}
+R-apply∙ : {u : Tm e ((a ⇒ b) * a)} {v : Val e ((a ⇒ b) * a)}
   → R u v
   → R (apply ∙ u) (apply∙' v)
 R-apply∙ (p , (q , ss) , r)
@@ -364,7 +199,7 @@ beta-lemma = trans
 
 -- trace builder for composition
 Fund∙ : {a b : Ty} (t : Tm a b) → Set
-Fund∙ {a} {b} t = ∀ {e} {u : Tm e a} {v : Sem e a}
+Fund∙ {a} {b} t = ∀ {e} {u : Tm e a} {v : Val e a}
   → R u v
   → R (t ∙ u) (eval∙ t v)
 
@@ -438,8 +273,8 @@ id⟶*idn {a ⇒ b} = refl
 id⟶*idn {a * b} = refl
 
 -- trace pairing
-R-pair : {t : Tm a b} {x : Sem a b}
-  {u : Tm a c} {y : Sem a c}
+R-pair : {t : Tm a b} {x : Val a b}
+  {u : Tm a c} {y : Val a c}
   → R t x
   → R u y
   → R (pair t u) (pair' x y)

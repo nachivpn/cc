@@ -9,6 +9,7 @@ open import Relation.Nullary
 open import Data.Product
   using (Σ ; _×_ ; _,_ ; proj₁ ; proj₂)
 
+open import CCLBetaWeak.CCL
 open import CCLBetaWeak.Norm
 
 -- defn.: "beta rules" (all but the expansive exp-apply∙ rule)

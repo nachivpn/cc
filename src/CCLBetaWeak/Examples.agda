@@ -1,5 +1,6 @@
 module CCLBetaWeak.Examples where
 
+open import CCLBetaWeak.CCL
 open import CCLBetaWeak.Norm
 open import Relation.Binary.Construct.Closure.ReflexiveTransitive
   using (Star)
