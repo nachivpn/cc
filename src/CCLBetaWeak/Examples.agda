@@ -111,12 +111,13 @@ _ = refl
 _ : norm {𝕓 * 𝕓} fst ≡ fst
 _ = refl
 
-_ : norm {(𝕓 ⇒ 𝕓) * 𝕓} apply ≡ apply
-_ = refl
 
 --
 -- some expansion at application site
 --
+
+_ : norm {(𝕓 ⇒ 𝕓) * 𝕓} apply ≡ (apply ∙ pair fst snd)
+_ = refl
 
 _ : norm {(𝕓 ⇒ 𝕓) * 𝕓}
          (apply ∙ id) ≡ (apply ∙ pair fst snd)

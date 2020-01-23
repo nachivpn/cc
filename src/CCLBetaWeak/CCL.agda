@@ -57,11 +57,11 @@ data _⟶_ : Tm a b → Tm a b → Set where
   comp-pair : {f : Tm b c} {g : Tm b d} {h : Tm a b}
     → pair f g ∙ h ⟶ pair (f ∙ h) (g ∙ h)
   comp-curry : {h : Tm d c} {f : Tm (c * a) b}
-    → curry f ∙ h ⟶ curry (f ∙ (h ⊗ id))
+    → curry f ∙ h ⟶ curry (f ∙ pair (h ∙ fst) snd)
 
   -- "surjective pairing" restricted to application site
-  exp-apply∙ : {u : Tm a ((b ⇒ c) * b)}
-    → apply ∙ u ⟶ apply ∙ pair (fst ∙ u) (snd ∙ u)
+  exp-apply :
+    apply {a} {b} ⟶ apply ∙ pair fst snd
 
   -- congruence rules
   cong-pair1 : {f f' : Tm a b} {g : Tm a c}
@@ -132,9 +132,6 @@ data Ne where
   -- contract of `curry (apply)`
   id⇒      : Ne (a ⇒ b) (a ⇒ b)
 
-  -- apply
-  apply    : Ne ((a ⇒ b) * a) b
-
   -- apply ∙ pair n m
   app∙pair : Ne a (b ⇒ c) → Nf a b → Ne a c
 
@@ -162,7 +159,6 @@ embNe snd            = snd
 embNe (fst∙ t)       = fst ∙ embNe t
 embNe (snd∙ t)       = snd ∙ embNe t
 embNe id⇒            = id
-embNe apply          = apply
 embNe (app∙pair t u) = apply ∙ pair (embNe t) (embNf u)
 
 embNf (up x)     = embNe x

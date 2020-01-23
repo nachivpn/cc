@@ -110,7 +110,7 @@ eval∙ (pair t u) x
   , (eval∙ t x)
   , (eval∙ u x)
 eval∙ (curry t) x
-  = curry (t ∙ quot x ⊗ id)
+  = curry (t ∙ pair (quot x ∙ fst) snd)
   , λ y → eval∙ t (pair (reify x) (reify y) , x , y)
 
 -- interpretation of terms
@@ -120,7 +120,7 @@ eval (t ∙ u)    = eval∙ t (eval u)
 eval fst        = reflect fst
 eval snd        = reflect snd
 eval unit       = unit
-eval apply      = reflect apply
+eval apply      = reflect (app∙pair fst (up snd))
 eval (pair t u) = pair' (eval t) (eval u)
 eval (curry t)  = (curry t) , λ x → eval∙ t (pair idn (reify x) , id' , x)
 
@@ -173,17 +173,22 @@ R-chain {b = b * c} g⟶*f (f⟶*x , sc1 , sc2)
   , R-chain (cong-∙ refl g⟶*f) sc1
   , R-chain (cong-∙ refl g⟶*f) sc2
 
+exp-apply∙ : {u : Tm a ((b ⇒ c) * b)}
+    → apply ∙ u ⟶* apply ∙ pair (fst ∙ u) (snd ∙ u)
+exp-apply∙ = trans (cong-∙ (lift exp-apply) refl)
+  (trans (lift assoc) (cong-∙ refl (lift comp-pair)))
+
 -- trace application composition
 R-apply∙ : {u : Tm e ((a ⇒ b) * a)} {v : Val e ((a ⇒ b) * a)}
   → R u v
   → R (apply ∙ u) (apply∙' v)
 R-apply∙ (p , (q , ss) , r)
-  = R-chain (lift exp-apply∙) (ss r)
+  = R-chain exp-apply∙ (ss r)
 
 -- lemma for reducing function application
 beta-lemma :
  {t : Tm (b * c) d} {u1 : Tm a b} {u2 : Tm a c }
- → (apply ∙ pair (curry (t ∙ (u1 ⊗ id))) u2)
+ → (apply ∙ pair (curry (t ∙ pair (u1 ∙ fst) snd)) u2)
    ⟶* t ∙ pair u1 u2
 beta-lemma = trans
   (lift red-apply)
@@ -195,7 +200,7 @@ beta-lemma = trans
          (lift comp-pair)
          (cong-pair
            (trans (lift assoc) (trans (cong-∙ refl (lift red-fst)) (lift red-idr)))
-           (trans (lift assoc) (trans (cong-∙ refl (lift red-snd)) (lift red-idl)))))))
+           (lift red-snd)))))
 
 -- trace builder for composition
 Fund∙ : {a b : Ty} (t : Tm a b) → Set
@@ -283,6 +288,7 @@ R-pair tRx uRy
   , (R-chain (lift red-fst) tRx)
   , (R-chain (lift red-snd) uRy)
 
+
 -- trace interpretation
 fund : (t : Tm a b) → R t (eval t)
 fund id = R-id
@@ -297,7 +303,7 @@ fund (curry t) = refl , (λ {u = u} {v} uRv
       (fund∙ t (cong-pair id⟶*idn (R-reduces uRv)
       , R-chain (lift red-fst) R-id
       , R-chain (lift red-snd) uRv)))
-fund apply = R-reflect apply
+fund apply = R-chain (lift exp-apply) (R-reflect _)
 
 -- trace normalization
 trace : (t : Tm a b) → t ⟶* norm t

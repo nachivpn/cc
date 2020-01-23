@@ -23,7 +23,7 @@ BetaRule red-unit       = ⊤
 BetaRule assoc          = ⊤
 BetaRule comp-pair      = ⊤
 BetaRule comp-curry     = ⊤
-BetaRule exp-apply∙     = ⊥ -- not a beta rule!
+BetaRule exp-apply      = ⊥ -- not a beta rule!
 BetaRule (cong-pair1 p) = BetaRule p
 BetaRule (cong-pair2 p) = BetaRule p
 BetaRule (cong-∙1 p)    = BetaRule p
@@ -73,33 +73,38 @@ fst∙Lemma fst f (cong-∙2 r , rBeta) = f (r , rBeta)
 fst∙Lemma snd f (cong-∙2 r , rBeta) = f (r , rBeta)
 fst∙Lemma (fst∙ n) f (cong-∙2 r , rBeta) = f (r , rBeta)
 fst∙Lemma (snd∙ n) f (cong-∙2 r , rBeta) = f (r , rBeta)
-fst∙Lemma apply f (cong-∙2 r , rBeta) = f (r , rBeta)
 fst∙Lemma (app∙pair n x) f (cong-∙2 r , rBeta) = f (r , rBeta)
 
 snd∙Lemma fst f (cong-∙2 r , rBeta) = f (r , rBeta)
 snd∙Lemma snd f (cong-∙2 r , rBeta) = f (r , rBeta)
 snd∙Lemma (fst∙ n) f (cong-∙2 r , rBeta) = f (r , rBeta)
 snd∙Lemma (snd∙ n) f (cong-∙2 r , rBeta) = f (r , rBeta)
-snd∙Lemma apply f (cong-∙2 r , rBeta) = f (r , rBeta)
 snd∙Lemma (app∙pair n x) f (cong-∙2 r , rBeta) = f (r , rBeta)
 
 app∙pairLemma fst m (cong-∙2 (cong-pair2 r) , rBeta)
   = nfBetaNormal m (r , rBeta)
+app∙pairLemma fst m (cong-∙1 exp-apply , ())
+app∙pairLemma fst m (cong-∙2 (cong-pair1 ()) , rBeta)
 app∙pairLemma snd m (cong-∙2 (cong-pair2 r) , rBeta)
   = nfBetaNormal m (r , rBeta)
+app∙pairLemma snd m (cong-∙1 exp-apply , ())
+app∙pairLemma snd m (cong-∙2 (cong-pair1 ()) , rBeta)
 app∙pairLemma (fst∙ n) m (cong-∙2 (cong-pair1 r) , rBeta)
   = fst∙Lemma n (neBetaNormal n) (r , rBeta)
 app∙pairLemma (fst∙ n) m (cong-∙2 (cong-pair2 r) , rBeta)
   = nfBetaNormal m (r , rBeta)
+app∙pairLemma (fst∙ n) m (cong-∙1 exp-apply , ())
 app∙pairLemma (snd∙ n) m (cong-∙2 (cong-pair1 r) , rBeta)
   = snd∙Lemma n (neBetaNormal n) (r , rBeta)
 app∙pairLemma (snd∙ n) m (cong-∙2 (cong-pair2 r) , rBeta)
   = nfBetaNormal m (r , rBeta)
+app∙pairLemma (snd∙ n) m (cong-∙1 exp-apply , ())
 app∙pairLemma id⇒ m (cong-∙2 (cong-pair2 r) , rBeta)
   = nfBetaNormal m (r , rBeta)
-app∙pairLemma apply m (cong-∙2 (cong-pair2 r) , rBeta)
-  = nfBetaNormal m (r , rBeta)
+app∙pairLemma id⇒ m (cong-∙1 exp-apply , ())
+app∙pairLemma id⇒ m (cong-∙2 (cong-pair1 ()) , rBeta)
 app∙pairLemma (app∙pair n x) m (cong-∙2 (cong-pair1 r) , rBeta)
   = app∙pairLemma n x (r , rBeta)
 app∙pairLemma (app∙pair n x) m (cong-∙2 (cong-pair2 r) , rBeta)
   = nfBetaNormal m (r , rBeta)
+app∙pairLemma (app∙pair n x) m (cong-∙1 exp-apply , ())
