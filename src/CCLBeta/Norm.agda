@@ -40,19 +40,19 @@ Val a (b * c) = Nf a (b * c) × (Val a b × Val a c)
 
 -- weaken a value (strictly)
 wkVal⊂ : a' ⊂ a → Val a b → Val a' b
-wkVal⊂ {b = 𝕓} pc v
-  = wkNf⊂ pc v
-wkVal⊂ {b = 𝟙} pc v
-  = wkNf⊂ pc v
-wkVal⊂ {b = b ⇒ c} pc (n , f)
-  = wkNf⊂ pc n , λ pc' x → f (⊆-trans pc' (inj₂ pc)) x
-wkVal⊂ {b = b * c} pc (n , x , y)
-  = wkNf⊂ pc n  , wkVal⊂ pc x , wkVal⊂ pc y
+wkVal⊂ {b = 𝕓} w v
+  = wkNf⊂ w v
+wkVal⊂ {b = 𝟙} w v
+  = wkNf⊂ w v
+wkVal⊂ {b = b ⇒ c} w (n , f)
+  = wkNf⊂ w n , λ w' x → f (⊆-trans w' (inj₂ w)) x
+wkVal⊂ {b = b * c} w (n , x , y)
+  = wkNf⊂ w n  , wkVal⊂ w x , wkVal⊂ w y
 
 -- weaken a value
 wkVal : a' ⊆ a → Val a b → Val a' b
 wkVal (inj₁ refl) x = x
-wkVal (inj₂ pc)   x = wkVal⊂ pc x
+wkVal (inj₂ w)   x = wkVal⊂ w x
 
 -- embed ⊆ to Ne (only possible for arrow type)
 ⊆ToNe⇒ : e ⊆ (a ⇒ b) → Ne e (a ⇒ b)
@@ -74,14 +74,14 @@ quot x = embNf (reify x)
 reflect : Ne a b → Val a b
 reflect {b = 𝕓}     t = up t
 reflect {b = 𝟙}     t = up t
-reflect {b = b ⇒ c} t = up t , λ pc x → reflect (app∙pair (wkNe pc t) (reify x))
+reflect {b = b ⇒ c} t = up t , λ w x → reflect (app∙pair (wkNe w t) (reify x))
 reflect {b = b * c} t = up t , reflect (fst∙ t) , reflect (snd∙ t)
 
 -- semantic identity
 id' : Val a a
 id' {𝕓}     = id𝕓
 id' {𝟙}     = id𝟙
-id' {a ⇒ b} = up id⇒ , (λ pc x → reflect (app∙pair (⊆ToNe⇒ pc) (reify x)))
+id' {a ⇒ b} = up id⇒ , (λ w x → reflect (app∙pair (⊆ToNe⇒ w) (reify x)))
 id' {a * b} = id* , reflect fst , reflect snd
 
 infixr 4 _∘_
@@ -120,7 +120,7 @@ eval∙ (pair t u) x
   , (eval∙ u x)
 eval∙ (curry t) x
   = curry (reify (eval∙ t (pair' (wkVal (inj₂ fst) x) (reflect snd))))
-  , λ pc y → eval∙ t (pair' (wkVal pc x) y)
+  , λ w y → eval∙ t (pair' (wkVal w x) y)
 
 -- normalization function
 norm : Tm a b → Nf a b
