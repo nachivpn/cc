@@ -13,8 +13,10 @@ data Ty : Set where
   𝟙        : Ty
   _⇒_  _*_ : (a b : Ty) → Ty
 
-variable
-  a b c d e : Ty
+
+private
+  variable
+    a b c d e : Ty
 
 infixr 4 _∙_
 
@@ -115,9 +117,6 @@ cong-∙curry* (x ◅ p) = cong-curry x ◅ cong-∙curry* p
 -- neutral elements
 data Ne : Ty → Ty → Set
 
--- neutral pairs
-data Np : Ty → Ty → Set
-
 -- normal forms
 data Nf : Ty → Ty → Set
 
@@ -129,21 +128,16 @@ data Ne  where
   snd∙     : Ne a (b * c) → Ne a c
   app∙pair : Ne a (b ⇒ c) → Nf a b → Ne a c
 
-data Np where
-  up    : Ne a b → Np a b
-  pair  : Np a b → Np a c → Np a (b * c)
-
 data Nf where
   id𝕓   : Nf 𝕓 𝕓
   id𝟙   : Nf 𝟙 𝟙
   id*   : Nf (a * b) (a * b)
   unit  : Nf a 𝟙
-  up    : Np a b → Nf a b
+  up    : Ne a b → Nf a b
   pair  : Nf a b → Nf a c → Nf a (b * c)
   curry : Nf (a * b) c → Nf a (b ⇒ c)
 
 embNe : Ne a b → Tm a b
-embNp : Np a b → Tm a b
 embNf : Nf a b → Tm a b
 
 embNe fst            = fst
@@ -153,10 +147,7 @@ embNe (snd∙ n)       = snd ∙ embNe n
 embNe id⇒            = id
 embNe (app∙pair t u) = apply ∙ pair (embNe t) (embNf u)
 
-embNp (up n)     = embNe n
-embNp (pair m n) = pair (embNp m) (embNp n)
-
-embNf (up n)     = embNp n
+embNf (up n)     = embNe n
 embNf id𝕓        = id
 embNf id𝟙        = id
 embNf id*        = id

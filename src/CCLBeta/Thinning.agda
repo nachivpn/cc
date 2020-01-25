@@ -1,38 +1,39 @@
 module CCLBeta.Thinning where
 
 open import CCLBeta.CCL
-  using (Ty ; Tm ; Ne ; Np ; Nf)
+  using (Ty ; Tm ; Ne ; Nf)
 
-open Ty
-open Tm
-open Ne
-open Np
-open Nf
+open import Data.Sum
+  using (_⊎_ ; inj₁ ; inj₂)
+open import Relation.Binary.PropositionalEquality
+  using (_≡_ ; refl)
 
-variable
-  a b c d e Γ : Ty
+open Ty ; open Tm
+open Ne ; open Nf
+
+private
+  variable
+    a b c d e Γ : Ty
 
 -- "projection chains"
-data _≤₀_ : Ty → Ty → Set where
-  fst  : (a * b) ≤₀ a
-  snd  : (a * b) ≤₀ b
-  ∙fst : a ≤₀ b → (a * c) ≤₀ b
-  ∙snd : c ≤₀ b → (a * c) ≤₀ b
+data _⊂_ : Ty → Ty → Set where
+  fst  : (a * b) ⊂ a
+  snd  : (a * b) ⊂ b
+  ∙fst : a ⊂ b → (a * c) ⊂ b
+  ∙snd : c ⊂ b → (a * c) ⊂ b
 
--- "thinnings"
-data _≤_ : Ty → Ty → Set where
-  up≤  : a ≤₀ b → a ≤ b
-  pair : d ≤ a → d ≤ b → d ≤ (a * b)
+-- embed projection chains to terms
+emb⊂ToTm : a ⊂ b → Tm a b
+emb⊂ToTm fst = fst
+emb⊂ToTm snd = snd
+emb⊂ToTm (∙fst pc) = emb⊂ToTm pc ∙ fst
+emb⊂ToTm (∙snd pc) = emb⊂ToTm pc ∙ snd
 
-emb≤₀ : a ≤₀ b → Tm a b
-emb≤₀ fst = fst
-emb≤₀ snd = snd
-emb≤₀ (∙fst pc) = emb≤₀ pc ∙ fst
-emb≤₀ (∙snd pc) = emb≤₀ pc ∙ snd
-
-emb≤ : a ≤ b → Tm a b
-emb≤ (up≤ x) = emb≤₀ x
-emb≤ (pair th th') = pair (emb≤ th) (emb≤ th')
+⊂-trans : a ⊂ b → b ⊂ c → a ⊂ c
+⊂-trans fst pc' = ∙fst pc'
+⊂-trans snd pc' = ∙snd pc'
+⊂-trans (∙fst pc) pc' = ∙fst (⊂-trans pc pc')
+⊂-trans (∙snd pc) pc' = ∙snd (⊂-trans pc pc')
 
 -- `Entry Γ a b` represents single constructor (Ne Γ a → Ne Γ b)
 data Entry (Γ : Ty) : Ty → Ty → Set where
@@ -62,33 +63,54 @@ plugNe []      n = n
 plugNe (x ∷ s) n = plugNe s (neConstr x n)
 
 -- generate a spine for projection chains
-genSpine : a ≤₀ b → Spine Γ a b
-genSpine fst      = fst∙□ ∷ []
-genSpine snd      = snd∙□ ∷ []
+genSpine : a ⊂ b → Spine Γ a b
+genSpine fst       = fst∙□ ∷ []
+genSpine snd       = snd∙□ ∷ []
 genSpine (∙fst pc) = fst∙□ ∷ genSpine pc
 genSpine (∙snd pc) = snd∙□ ∷ genSpine pc
 
 -- embed projection chains into neutral elements
-emb≤₀ToNe : a ≤₀ b → Ne a b
-emb≤₀ToNe fst      = fst
-emb≤₀ToNe snd      = snd
-emb≤₀ToNe (∙fst pc) = plugNe (genSpine pc) fst
-emb≤₀ToNe (∙snd pc) = plugNe (genSpine pc) snd
+emb⊂ToNe : a ⊂ b → Ne a b
+emb⊂ToNe fst      = fst
+emb⊂ToNe snd      = snd
+emb⊂ToNe (∙fst pc) = plugNe (genSpine pc) fst
+emb⊂ToNe (∙snd pc) = plugNe (genSpine pc) snd
+
+-- "thinnings"
+data Th : Ty → Ty → Set where
+  up≤  : a ⊂ b → Th a b
+  pair : Th d a → Th d b → Th d (a * b)
+
+-- embed thinnings into terms
+embThToTm : Th a b → Tm a b
+embThToTm (up≤ x) = emb⊂ToTm x
+embThToTm (pair th th') = pair (embThToTm th) (embThToTm th')
 
 -- thinnings admit "drop"
-drop : a ≤ b → (a * c) ≤ b
+drop : Th a b → Th (a * c) b
 drop (up≤ pc)      = up≤ (∙fst pc)
 drop (pair th th') = pair (drop th) (drop th')
 
 -- thinnings admit "keep"
-keep : a ≤ b → (a * c) ≤ (b * c)
+keep : Th a b → Th (a * c) (b * c)
 keep (up≤ pc)      = pair (up≤ (∙fst pc)) (up≤ snd)
 keep (pair th th') = pair (pair (drop th) (drop th')) (up≤ snd)
 
--- embed thinnings into neutral pairs
-emb≤ToNp : a ≤ b → Np a b
-emb≤ToNp (up≤ x)       = up (emb≤₀ToNe x)
-emb≤ToNp (pair th th') = pair (emb≤ToNp th) (emb≤ToNp th')
+-- Intermediate data type to collect residual
+-- pairs from thinning a neutral
+data Np : Ty → Ty → Set where
+  up    : Ne a b → Np a b
+  pair  : Np a b → Np a c → Np a (b * c)
+
+-- neutral pairs are in normal forms
+embNpToNf : Np a b → Nf a b
+embNpToNf (up x)        = up x
+embNpToNf (pair th th') = pair (embNpToNf th) (embNpToNf th')
+
+-- translate thinnings into neutral pairs
+thToNp : Th a b → Np a b
+thToNp (up≤ x)       = up (emb⊂ToNe x)
+thToNp (pair th th') = pair (thToNp th) (thToNp th')
 
 -- transforms an Entry into a constructor of Np
 -- (note that it triggers some reductions!)
@@ -102,44 +124,66 @@ plugNp : Spine Γ b c → Np Γ b → Np Γ c
 plugNp [] n = n
 plugNp (x ∷ s) n = plugNp s (npConstr x n)
 
--- Weaken neutrals and normal forms using thinnings
-
-wkNe₀ : Γ ≤₀ a → Ne a b → Ne Γ b
-wkNe  : Γ ≤ a  → Ne a b → Np Γ b -- Note the resulting type!
-wkNp  : Γ ≤ a  → Np a b → Np Γ b
-wkNf  : Γ ≤ a  → Nf a b → Nf Γ b
-
-wkNe₀ pc id⇒      = emb≤₀ToNe pc
-wkNe₀ pc (fst∙ n) = fst∙ (wkNe₀ pc n)
-wkNe₀ pc (snd∙ n) = snd∙ (wkNe₀ pc n)
-wkNe₀ pc fst      = fst∙ (emb≤₀ToNe pc)
-wkNe₀ pc snd      = snd∙ (emb≤₀ToNe pc)
-wkNe₀ pc (app∙pair n x) = app∙pair (wkNe₀ pc n) (wkNf (up≤ pc) x)
-
-module _ where
+-- thinning lemma for normal forms
+thNf   : Th Γ a → Nf a b → Nf Γ b
+thNf th id*        = embNpToNf (thToNp th)
+thNf th id𝕓        = embNpToNf (thToNp th)
+thNf th id𝟙        = embNpToNf (thToNp th)
+thNf th unit       = unit
+thNf th (pair m n) = pair (thNf th m) (thNf th n)
+thNf th (curry n)  = curry (thNf (keep th) n)
+thNf th (up x)     = embNpToNf (thNe th x)
+  where
 
   -- transforms a neutral to a spine for weaker inputs ("a thin spine")
-  genThnSpine : Ne a b → Γ ≤ a → Spine Γ a b
+  genThnSpine : Ne a b → Th Γ a → Spine Γ a b
   genThnSpine id⇒      th = []
   genThnSpine fst      th = fst∙□ ∷ []
   genThnSpine snd      th = snd∙□ ∷ []
   genThnSpine (fst∙ n) th = snoc (genThnSpine n th) fst∙□
   genThnSpine (snd∙ n) th = snoc (genThnSpine n th) snd∙□
-  genThnSpine (app∙pair n x) th = snoc (genThnSpine n th) (app∙⟨□,⟩ (wkNf th x))
+  genThnSpine (app∙pair n x) th = snoc (genThnSpine n th) (app∙⟨□,⟩ (thNf th x))
 
--- weakens a neutral by first generating a thin spine
--- and then transforming it into a neutral pair
-wkNe th n = plugNp (genThnSpine n th) (emb≤ToNp th)
+  -- thinning lemma for neutrals
+  -- implemented by first generating a thin spine
+  -- and then evaluating it to a neutral *pair* (Np)
+  thNe  : Th Γ a → Ne a b → Np Γ b
+  thNe th n = plugNp (genThnSpine n th) (thToNp th)
 
--- weaken a neutral pair by induction
-wkNp th (up n)     = wkNe th n
-wkNp th (pair m n) = pair (wkNp th m) (wkNp th n)
+-- weaken normal forms (strictly)
+wkNf⊂ : Γ ⊂ a → Nf a b → Nf Γ b
+wkNf⊂ pc n = thNf (up≤ pc) n
 
--- weaken a normal form by induction
-wkNf th id𝕓        = up (emb≤ToNp th)
-wkNf th id𝟙        = up (emb≤ToNp th)
-wkNf th id*        = up (emb≤ToNp th)
-wkNf th unit       = unit
-wkNf th (up x)     = up (wkNp th x)
-wkNf th (pair m n) = pair (wkNf th m) (wkNf th n)
-wkNf th (curry n)  = curry (wkNf (keep th) n)
+-- weaken neutral elements (strictly)
+wkNe⊂ : Γ ⊂ a → Ne a b → Ne Γ b
+wkNe⊂ pc id⇒      = emb⊂ToNe pc
+wkNe⊂ pc fst      = fst∙ (emb⊂ToNe pc)
+wkNe⊂ pc snd      = snd∙ (emb⊂ToNe pc)
+wkNe⊂ pc (fst∙ n) = fst∙ (wkNe⊂ pc n)
+wkNe⊂ pc (snd∙ n) = snd∙ (wkNe⊂ pc n)
+wkNe⊂ pc (app∙pair n x) = app∙pair (wkNe⊂ pc n) (thNf (up≤ pc) x)
+
+-- weakening relation
+_⊆_ : Ty → Ty → Set
+a ⊆ b = a ≡ b ⊎ (a ⊂ b)
+
+-- weakening relation is reflexive
+⊆-refl : a ⊆ a
+⊆-refl = inj₁ refl
+
+-- weakening relation is transitive
+⊆-trans : e ⊆ a → a ⊆ b → e ⊆ b
+⊆-trans (inj₁ refl) (inj₁ refl) = inj₁ refl
+⊆-trans (inj₁ refl) (inj₂ pc)   = inj₂ pc
+⊆-trans (inj₂ pc)   (inj₁ refl) = inj₂ pc
+⊆-trans (inj₂ pc)   (inj₂ pc')  = inj₂ (⊂-trans pc pc')
+
+-- weaken neutral elements
+wkNe : e ⊆ a → Ne a b → Ne e b
+wkNe (inj₁ refl) x = x
+wkNe (inj₂ pc)   x = wkNe⊂ pc x
+
+-- weaken normal forms
+wkNf : e ⊆ a → Nf a b → Nf e b
+wkNf (inj₁ refl) n = n
+wkNf (inj₂ pc)   n = wkNf⊂ pc n
