@@ -11,6 +11,10 @@ open import Data.Product
 
 open import CCLBeta.CCL
 
+private
+  variable
+    a b c d e : Ty
+
 -- defn.: "beta rules" (all but the expansive exp-apply∙ rule)
 BetaRule : {t t' : Tm a b} → t ⟶ t' → Set
 BetaRule red-idl        = ⊤
@@ -59,17 +63,9 @@ neBetaNormal (snd∙ n) redp
 neBetaNormal (app∙pair n x) redp
   = app∙pairLemma n x redp
 
-npBetaNormal : (n : Np a b) → BetaNormal (embNp n)
-npBetaNormal (up x) redp
-  = neBetaNormal x redp
-npBetaNormal (pair m n) (cong-pair1 r , rBeta)
-  = npBetaNormal m (r , rBeta)
-npBetaNormal (pair m n) (cong-pair2 r , rBeta)
-  = npBetaNormal n (r , rBeta)
-
 nfBetaNormal : (n : Nf a b) → BetaNormal (embNf n)
 nfBetaNormal (up x) redp
-  = npBetaNormal x redp
+  = neBetaNormal x redp
 nfBetaNormal (pair n m) (cong-pair1 r , rBeta)
   = nfBetaNormal n (r , rBeta)
 nfBetaNormal (pair n m) (cong-pair2 r , rBeta)
