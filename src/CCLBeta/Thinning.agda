@@ -13,159 +13,167 @@ open Ne ; open Nf
 
 private
   variable
-    a b c d e Γ : Ty
+    a b c d e : Ty
 
--- "projection chains"
-data _⊂_ : Ty → Ty → Set where
-  fst  : (a * b) ⊂ a
-  snd  : (a * b) ⊂ b
-  ∙fst : a ⊂ b → (a * c) ⊂ b
-  ∙snd : c ⊂ b → (a * c) ⊂ b
+-- projections
+data Prj : Ty → Ty → Set where
+  fst  : Prj (a * b) a
+  snd  : Prj (a * b) b
+  ∙fst : Prj a b → Prj (a * c) b
+  ∙snd : Prj c b → Prj (a * c) b
 
--- embed projection chains to terms
-emb⊂ToTm : a ⊂ b → Tm a b
-emb⊂ToTm fst = fst
-emb⊂ToTm snd = snd
-emb⊂ToTm (∙fst pc) = emb⊂ToTm pc ∙ fst
-emb⊂ToTm (∙snd pc) = emb⊂ToTm pc ∙ snd
+-- embed projections to terms
+embPrjToTm : Prj a b → Tm a b
+embPrjToTm fst = fst
+embPrjToTm snd = snd
+embPrjToTm (∙fst pc) = embPrjToTm pc ∙ fst
+embPrjToTm (∙snd pc) = embPrjToTm pc ∙ snd
 
-⊂-trans : a ⊂ b → b ⊂ c → a ⊂ c
-⊂-trans fst pc' = ∙fst pc'
-⊂-trans snd pc' = ∙snd pc'
-⊂-trans (∙fst pc) pc' = ∙fst (⊂-trans pc pc')
-⊂-trans (∙snd pc) pc' = ∙snd (⊂-trans pc pc')
+-- reverse-composition of projections
+-- (alt. projections are transitive)
+Prj-trans : Prj a b → Prj b c → Prj a c
+Prj-trans fst pc' = ∙fst pc'
+Prj-trans snd pc' = ∙snd pc'
+Prj-trans (∙fst pc) pc' = ∙fst (Prj-trans pc pc')
+Prj-trans (∙snd pc) pc' = ∙snd (Prj-trans pc pc')
 
--- `Entry Γ a b` represents single constructor (Ne Γ a → Ne Γ b)
-data Entry (Γ : Ty) : Ty → Ty → Set where
-  fst∙□    : Entry Γ (a * b) a
-  snd∙□    : Entry Γ (b * c) c
-  app∙⟨□,⟩ : Nf Γ a → Entry Γ (a ⇒ b) b
+-- `Entry a b c` represents single constructor (Ne a b → Ne a c)
+data Entry (i : Ty) : Ty → Ty → Set where
+  fst∙□    : Entry i (a * b) a
+  snd∙□    : Entry i (b * c) c
+  app∙⟨□,⟩ : Nf i a → Entry i (a ⇒ b) b
 
 -- transforms an Entry into a constructor of Ne
-neConstr : Entry Γ a b → (Ne Γ a → Ne Γ b)
+neConstr : Entry a b c → (Ne a b → Ne a c)
 neConstr fst∙□        n = fst∙ n
 neConstr snd∙□        n = snd∙ n
 neConstr (app∙⟨□,⟩ e) n = app∙pair n e
 
--- `Spine Γ a b` represents a constructor chain (Ne Γ a → Ne Γ b)
-data Spine (Γ : Ty) : Ty → Ty → Set where
-  []  : Spine Γ a a
-  _∷_ : Entry Γ a b → Spine Γ b c → Spine Γ a c
+-- `Spine a b c` represents a constructor chain (Ne a b → Ne a c)
+data Spine (i : Ty) : Ty → Ty → Set where
+  []  : Spine i a a
+  _∷_ : Entry i a b → Spine i b c → Spine i a c
 
 -- add an entry to the end of the spine
-snoc : Spine Γ a b → Entry Γ b c → Spine Γ a c
+snoc : Spine a b c → Entry a c d → Spine a b d
 snoc []      e = e ∷ []
 snoc (d ∷ s) e = d ∷ snoc s e
 
--- transforms a Spine into a constructor chain of Ne
-plugNe : Spine Γ b c → Ne Γ b → Ne Γ c
+-- transforms a spine into a constructor of Ne
+plugNe : Spine a b c → (Ne a b → Ne a c)
 plugNe []      n = n
 plugNe (x ∷ s) n = plugNe s (neConstr x n)
 
--- generate a spine for projection chains
-genSpine : a ⊂ b → Spine Γ a b
+-- generate a spine for projections
+genSpine : Prj b c → Spine a b c
 genSpine fst       = fst∙□ ∷ []
 genSpine snd       = snd∙□ ∷ []
 genSpine (∙fst pc) = fst∙□ ∷ genSpine pc
 genSpine (∙snd pc) = snd∙□ ∷ genSpine pc
 
--- embed projection chains into neutral elements
-emb⊂ToNe : a ⊂ b → Ne a b
-emb⊂ToNe fst      = fst
-emb⊂ToNe snd      = snd
-emb⊂ToNe (∙fst pc) = plugNe (genSpine pc) fst
-emb⊂ToNe (∙snd pc) = plugNe (genSpine pc) snd
+-- embed projections into neutral elements
+embPrjToNe : Prj a b → Ne a b
+embPrjToNe fst      = fst
+embPrjToNe snd      = snd
+embPrjToNe (∙fst pc) = plugNe (genSpine pc) fst
+embPrjToNe (∙snd pc) = plugNe (genSpine pc) snd
 
--- "thinnings"
-data Th : Ty → Ty → Set where
-  up≤  : a ⊂ b → Th a b
-  pair : Th d a → Th d b → Th d (a * b)
+-- "substitution" of projections
+-- analogous to a substituion made up of only variables
+data PSub : Ty → Ty → Set where
+  up≤  : Prj a b → PSub a b
+  pair : PSub d a → PSub d b → PSub d (a * b)
 
--- embed thinnings into terms
-embThToTm : Th a b → Tm a b
-embThToTm (up≤ x) = emb⊂ToTm x
-embThToTm (pair th th') = pair (embThToTm th) (embThToTm th')
+-- embed substitution into terms
+embPSubToTm : PSub a b → Tm a b
+embPSubToTm (up≤ x) = embPrjToTm x
+embPSubToTm (pair s s') = pair (embPSubToTm s) (embPSubToTm s')
 
--- thinnings admit "drop"
-drop : Th a b → Th (a * c) b
-drop (up≤ pc)      = up≤ (∙fst pc)
-drop (pair th th') = pair (drop th) (drop th')
+-- substitutions admit "drop"
+drop : PSub a b → PSub (a * c) b
+drop (up≤ pc)    = up≤ (∙fst pc)
+drop (pair s s') = pair (drop s) (drop s')
 
--- thinnings admit "keep"
-keep : Th a b → Th (a * c) (b * c)
+-- substitutions admit "keep"
+keep : PSub a b → PSub (a * c) (b * c)
 keep (up≤ pc)      = pair (up≤ (∙fst pc)) (up≤ snd)
-keep (pair th th') = pair (pair (drop th) (drop th')) (up≤ snd)
+keep (pair s s') = pair (pair (drop s) (drop s')) (up≤ snd)
 
--- Intermediate data type to collect residual
--- pairs from thinning a neutral
+-- "neutral pairs" are normal forms that result
+-- from applying a substitution to a neutral
 data Np : Ty → Ty → Set where
   up    : Ne a b → Np a b
   pair  : Np a b → Np a c → Np a (b * c)
 
--- neutral pairs are in normal forms
+-- neutral pairs are in normal form
 embNpToNf : Np a b → Nf a b
-embNpToNf (up x)        = up x
-embNpToNf (pair th th') = pair (embNpToNf th) (embNpToNf th')
+embNpToNf (up x)      = up x
+embNpToNf (pair s s') = pair (embNpToNf s) (embNpToNf s')
 
--- translate thinnings into neutral pairs
-thToNp : Th a b → Np a b
-thToNp (up≤ x)       = up (emb⊂ToNe x)
-thToNp (pair th th') = pair (thToNp th) (thToNp th')
+-- translate substitutions into neutral pairs
+subToNp : PSub a b → Np a b
+subToNp (up≤ x)     = up (embPrjToNe x)
+subToNp (pair s s') = pair (subToNp s) (subToNp s')
+
+-- translate substitutions into normal forms
+embSubToNf : PSub a b → Nf a b
+embSubToNf s = embNpToNf (subToNp s)
 
 -- transforms an Entry into a constructor of Np
 -- (note that it triggers some reductions!)
-npConstr : Entry Γ b c → Np Γ b → Np Γ c
+npConstr : Entry a b c → Np a b → Np a c
 npConstr e     (up x)     = up (neConstr e x)
 npConstr fst∙□ (pair m n) = m
 npConstr snd∙□ (pair m n) = n
 
--- transforms a Spine into a constructor chain of Np
-plugNp : Spine Γ b c → Np Γ b → Np Γ c
+-- transforms a spine into a constructor of Np
+plugNp : Spine a b c → (Np a b → Np a c)
 plugNp [] n = n
 plugNp (x ∷ s) n = plugNp s (npConstr x n)
 
--- thinning lemma for normal forms
-thNf   : Th Γ a → Nf a b → Nf Γ b
-thNf th id*        = embNpToNf (thToNp th)
-thNf th id𝕓        = embNpToNf (thToNp th)
-thNf th id𝟙        = embNpToNf (thToNp th)
-thNf th unit       = unit
-thNf th (pair m n) = pair (thNf th m) (thNf th n)
-thNf th (curry n)  = curry (thNf (keep th) n)
-thNf th (up x)     = embNpToNf (thNe th x)
+-- substitution lemma for normal forms
+subNf : PSub a b → Nf b c → Nf a c
+subNf s id*        = embSubToNf s
+subNf s id𝕓        = embSubToNf s
+subNf s id𝟙        = embSubToNf s
+subNf s unit       = unit
+subNf s (pair m n) = pair (subNf s m) (subNf s n)
+subNf s (curry n)  = curry (subNf (keep s) n)
+subNf s (up x)     = subNe s x
   where
 
-  -- transforms a neutral to a spine for weaker inputs ("a thin spine")
-  genThnSpine : Ne a b → Th Γ a → Spine Γ a b
-  genThnSpine id⇒      th = []
-  genThnSpine fst      th = fst∙□ ∷ []
-  genThnSpine snd      th = snd∙□ ∷ []
-  genThnSpine (fst∙ n) th = snoc (genThnSpine n th) fst∙□
-  genThnSpine (snd∙ n) th = snoc (genThnSpine n th) snd∙□
-  genThnSpine (app∙pair n x) th = snoc (genThnSpine n th) (app∙⟨□,⟩ (thNf th x))
+  -- generate a spine for the given neutral
+  -- (given substitution is applied to normal forms in the neutral)
+  genSubSpine : PSub a b → Ne b c → Spine a b c
+  genSubSpine s id⇒ = []
+  genSubSpine s fst = fst∙□ ∷ []
+  genSubSpine s snd = snd∙□ ∷ []
+  genSubSpine s (fst∙ n) = snoc (genSubSpine s n) fst∙□
+  genSubSpine s (snd∙ n) = snoc (genSubSpine s n) snd∙□
+  genSubSpine s (app∙pair n x) = snoc (genSubSpine s n) (app∙⟨□,⟩ (subNf s x))
 
-  -- thinning lemma for neutrals
-  -- implemented by first generating a thin spine
-  -- and then evaluating it to a neutral *pair* (Np)
-  thNe  : Th Γ a → Ne a b → Np Γ b
-  thNe th n = plugNp (genThnSpine n th) (thToNp th)
+  -- apply substitution to Ne to generate an Nf
+  subNe  : PSub a b → Ne b c → Nf a c
+  subNe s n = embNpToNf (plugNp (genSubSpine s n) (subToNp s))
 
--- weaken normal forms (strictly)
-wkNf⊂ : Γ ⊂ a → Nf a b → Nf Γ b
-wkNf⊂ pc n = thNf (up≤ pc) n
+-- pre-compose a projection to normal form
+-- i.e., weaken a normal form (strictly)
+wkNfPrj : Prj a b → Nf b c → Nf a c
+wkNfPrj pc n = subNf (up≤ pc) n
 
--- weaken neutral elements (strictly)
-wkNe⊂ : Γ ⊂ a → Ne a b → Ne Γ b
-wkNe⊂ pc id⇒      = emb⊂ToNe pc
-wkNe⊂ pc fst      = fst∙ (emb⊂ToNe pc)
-wkNe⊂ pc snd      = snd∙ (emb⊂ToNe pc)
-wkNe⊂ pc (fst∙ n) = fst∙ (wkNe⊂ pc n)
-wkNe⊂ pc (snd∙ n) = snd∙ (wkNe⊂ pc n)
-wkNe⊂ pc (app∙pair n x) = app∙pair (wkNe⊂ pc n) (thNf (up≤ pc) x)
+-- pre-compose a projection to neutral elements
+-- i.e., weaken a neutral element (strictly)
+wkNePrj : Prj a b → Ne b c → Ne a c
+wkNePrj pc id⇒      = embPrjToNe pc
+wkNePrj pc fst      = fst∙ (embPrjToNe pc)
+wkNePrj pc snd      = snd∙ (embPrjToNe pc)
+wkNePrj pc (fst∙ n) = fst∙ (wkNePrj pc n)
+wkNePrj pc (snd∙ n) = snd∙ (wkNePrj pc n)
+wkNePrj pc (app∙pair n x) = app∙pair (wkNePrj pc n) (subNf (up≤ pc) x)
 
--- weakening relation
+-- weakening relation (or "thinnings")
 _⊆_ : Ty → Ty → Set
-a ⊆ b = a ≡ b ⊎ (a ⊂ b)
+a ⊆ b = a ≡ b ⊎ (Prj a b)
 
 -- weakening relation is reflexive
 ⊆-refl : a ⊆ a
@@ -176,14 +184,14 @@ a ⊆ b = a ≡ b ⊎ (a ⊂ b)
 ⊆-trans (inj₁ refl) (inj₁ refl) = inj₁ refl
 ⊆-trans (inj₁ refl) (inj₂ pc)   = inj₂ pc
 ⊆-trans (inj₂ pc)   (inj₁ refl) = inj₂ pc
-⊆-trans (inj₂ pc)   (inj₂ pc')  = inj₂ (⊂-trans pc pc')
+⊆-trans (inj₂ pc)   (inj₂ pc')  = inj₂ (Prj-trans pc pc')
 
 -- weaken neutral elements
 wkNe : e ⊆ a → Ne a b → Ne e b
 wkNe (inj₁ refl) x = x
-wkNe (inj₂ pc)   x = wkNe⊂ pc x
+wkNe (inj₂ pc)   x = wkNePrj pc x
 
 -- weaken normal forms
 wkNf : e ⊆ a → Nf a b → Nf e b
 wkNf (inj₁ refl) n = n
-wkNf (inj₂ pc)   n = wkNf⊂ pc n
+wkNf (inj₂ pc)   n = wkNfPrj pc n

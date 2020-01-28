@@ -39,25 +39,25 @@ Val a (b ⇒ c) = Nf a (b ⇒ c) × ({e : Ty} → e ⊆ a → Val e b → Val e 
 Val a (b * c) = Nf a (b * c) × (Val a b × Val a c)
 
 -- weaken a value (strictly)
-wkVal⊂ : a' ⊂ a → Val a b → Val a' b
-wkVal⊂ {b = 𝕓} w v
-  = wkNf⊂ w v
-wkVal⊂ {b = 𝟙} w v
-  = wkNf⊂ w v
-wkVal⊂ {b = b ⇒ c} w (n , f)
-  = wkNf⊂ w n , λ w' x → f (⊆-trans w' (inj₂ w)) x
-wkVal⊂ {b = b * c} w (n , x , y)
-  = wkNf⊂ w n  , wkVal⊂ w x , wkVal⊂ w y
+wkValPrj : Prj a b → Val b c → Val a c
+wkValPrj {c = 𝕓} w v
+  = wkNfPrj w v
+wkValPrj {c = 𝟙} w v
+  = wkNfPrj w v
+wkValPrj {c = c ⇒ d} w (n , f)
+  = wkNfPrj w n , λ w' x → f (⊆-trans w' (inj₂ w)) x
+wkValPrj {c = c * d} w (n , x , y)
+  = wkNfPrj w n  , wkValPrj w x , wkValPrj w y
 
 -- weaken a value
 wkVal : a' ⊆ a → Val a b → Val a' b
 wkVal (inj₁ refl) x = x
-wkVal (inj₂ w)   x = wkVal⊂ w x
+wkVal (inj₂ w)   x = wkValPrj w x
 
--- embed ⊆ to Ne (only possible for arrow type)
+-- embed thinning to Ne (only possible for arrow type)
 ⊆ToNe⇒ : e ⊆ (a ⇒ b) → Ne e (a ⇒ b)
 ⊆ToNe⇒ (inj₁ refl) = id⇒
-⊆ToNe⇒ (inj₂ y)    = emb⊂ToNe y
+⊆ToNe⇒ (inj₂ y)    = embPrjToNe y
 
 -- from semantics to normal forms
 reify : Val e a → Nf e a
