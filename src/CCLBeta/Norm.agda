@@ -84,11 +84,13 @@ id' {𝟙}     = id𝟙
 id' {a ⇒ b} = up id⇒ , (λ w x → reflect (app∙pair (⊆ToNe⇒ w) (reify x)))
 id' {a * b} = id* , reflect fst , reflect snd
 
-infixr 4 _∘_
+-- projections are values (since they can be reflected)
+⊆ToVal : e ⊆ a → Val e a
+⊆ToVal (inj₁ refl) = id'
+⊆ToVal (inj₂ pc)   = reflect (embPrjToNe pc)
 
--- semantic application
-_∘_ : Val a (b ⇒ c) → Val a b → Val a c
-(_ , f) ∘ x = f (inj₁ refl) x
+app : Val a (b ⇒ c) → ({e : Ty} → e ⊆ a → Val e b → Val e c)
+app x = proj₂ x
 
 -- semantic projection fst composition
 fst∙' : Val a (b * c) → Val a b
@@ -100,7 +102,7 @@ snd∙' (_ , _ , x) = x
 
 -- semantic application composition
 apply∙' : Val a ((b ⇒ c) * b) → Val a c
-apply∙' (_ , f , x) = f ∘ x
+apply∙' (_ , f , x) = app f ⊆-refl x
 
 -- semantic pairing
 pair' : Val a b → Val a c → Val a (b * c)
@@ -122,6 +124,17 @@ eval∙ (curry t) x
   = curry (reify (eval∙ t (pair' (wkVal (inj₂ fst) x) (reflect snd))))
   , λ w y → eval∙ t (pair' (wkVal w x) y)
 
+-- interpretation of terms
+eval : Tm a b → Val a b
+eval id         = id'
+eval (t ∙ u)    = eval∙ t (eval u)
+eval fst        = reflect fst
+eval snd        = reflect snd
+eval unit       = unit
+eval apply      = reflect (app∙pair fst (up snd))
+eval (pair t u) = pair' (eval t) (eval u)
+eval (curry t)  = curry (reify (eval t)) , λ w x → eval∙ t (pair' (⊆ToVal w) x)
+
 -- normalization function
 norm : Tm a b → Nf a b
-norm t = reify (eval∙ t id')
+norm t = reify (eval t)
