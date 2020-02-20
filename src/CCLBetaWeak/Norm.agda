@@ -1,3 +1,4 @@
+
 module CCLBetaWeak.Norm where
 
 open import CCLBetaWeak.CCL
@@ -10,11 +11,6 @@ open import Data.Product
   using (_×_ ; _,_ ; proj₁ ; proj₂)
 open import Data.Sum
   using (_⊎_ ; inj₁ ; inj₂)
-open import Relation.Binary.Construct.Closure.ReflexiveTransitive
-  using (Star)
-  renaming (_◅◅_ to trans)
-
-open Star renaming (ε to refl)
 
 -- normal identity
 idn : Nf a a

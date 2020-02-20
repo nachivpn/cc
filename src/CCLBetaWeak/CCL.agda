@@ -2,9 +2,9 @@ module CCLBetaWeak.CCL where
 
 open import Relation.Binary.Construct.Closure.ReflexiveTransitive
   using (Star)
-  renaming (_◅◅_ to trans)
+  renaming (_◅◅_ to trans) public
 
-open Star renaming (ε to refl)
+open Star renaming (ε to refl) public
 
 infixr 5 _⇒_
 
