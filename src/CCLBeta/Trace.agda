@@ -13,13 +13,10 @@ open import Data.Product
 open import Data.Sum
   using (_⊎_ ; inj₁ ; inj₂)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_ ; refl; cong ; cong₂)
+  using (_≡_ ; refl; cong ; cong₂; sym)
   renaming (trans to ≡-trans)
 open import Relation.Binary.Construct.Closure.ReflexiveTransitive
-  using (Star)
-  renaming (_◅◅_ to trans)
-
-open Star renaming (ε to refl)
+  renaming (ε to refl)
 
 private
   variable
@@ -32,11 +29,96 @@ private
 pattern ⊆-refl  = inj₁ refl
 pattern up-⊆ pc = inj₂ pc
 
-wkTm : e ⊆ a → Tm a b → Tm e b
-wkTm ⊆-refl t    = t
-wkTm (up-⊆ pc) t = t ∙ embPrjToTm pc
+-- deep compose
+-- e.g., deep-∙ (f ∙ (g ∙ h)) m ≡ (f ∙ (g ∙ (h ∙ m)))
+deep-∙ : Tm b c → Tm a b → Tm a c
+deep-∙ id u = u
+deep-∙ (t ∙ t') u = t ∙ deep-∙ t' u
+deep-∙ fst u = fst ∙ u
+deep-∙ snd u = snd ∙ u
+deep-∙ (pair t t') u = pair t t' ∙ u
+deep-∙ unit u = unit
+deep-∙ (curry t) u = curry t ∙ u
+deep-∙ apply u = apply ∙ u
 
--- trace builder
+wkTmPrj : Prj e a → Tm a b → Tm e b
+wkTmPrj fst t       = deep-∙ t fst
+wkTmPrj snd t       = deep-∙ t snd
+wkTmPrj (∙fst pc) t = deep-∙ t (embPrjToTm (∙fst pc))
+wkTmPrj (∙snd pc) t = deep-∙ t (embPrjToTm (∙snd pc))
+
+wkTm : e ⊆ a → Tm a b → Tm e b
+wkTm ⊆-refl    t = t
+wkTm (up-⊆ pc) t = wkTmPrj pc t
+
+-- a req. for implementing wk-pres-R (see below)
+wk-is-deep-∙ : (pc : Prj e a) (t : Tm a b) {u : Tm b c}
+  → wkTmPrj pc (u ∙ t) ≡ (u ∙ wkTmPrj pc t)
+wk-is-deep-∙ fst t = refl
+wk-is-deep-∙ snd t = refl
+wk-is-deep-∙ (∙fst pc) t = refl
+wk-is-deep-∙ (∙snd pc) t = refl
+
+-- functor laws of wkTm
+
+wkTm-pres-id : {t : Tm a b}
+  → wkTm ⊆-refl t ≡ t
+wkTm-pres-id = refl
+
+wkTmPrj-pres-∘ : {t : Tm a b} (pc : Prj e a') (pc' : Prj a' a)
+  → wkTmPrj (Prj-trans pc pc') t ≡ wkTmPrj pc (wkTmPrj pc' t)
+-- TODO
+
+wkTm-pres-∘  : {t : Tm a b} (w1 : e ⊆ a') (w2 : a' ⊆ a)
+  → wkTm (w2 ∘ w1) t ≡ wkTm w1 (wkTm w2 t)
+wkTm-pres-∘ ⊆-refl    ⊆-refl     = refl
+wkTm-pres-∘ ⊆-refl    (up-⊆ pc)  = refl
+wkTm-pres-∘ (up-⊆ pc) ⊆-refl     = refl
+wkTm-pres-∘ (up-⊆ pc) (up-⊆ pc') = wkTmPrj-pres-∘ pc pc'
+
+wkTmPrj-pres-⟶* : {t t' : Tm a b}
+  → (pc : Prj e a)
+  → t ⟶* t'
+  → wkTmPrj pc t ⟶* wkTmPrj pc t'
+-- TODO
+
+-- trace the weakening of terms
+wkTm-pres-⟶* : {t t' : Tm a b}
+  → (w : e ⊆ a)
+  → t ⟶* t'
+  → wkTm w t ⟶* wkTm w t'
+wkTm-pres-⟶* ⊆-refl    r = r
+wkTm-pres-⟶* (up-⊆ pc) r = wkTmPrj-pres-⟶* pc r
+
+-- should really just be equal (≡) ?
+tracePrjToNe : (pc : Prj a b)
+  → (embPrjToTm pc) ⟶* (embNe (embPrjToNe pc))
+tracePrjToNe fst = refl
+tracePrjToNe snd = refl
+tracePrjToNe (∙fst pc) = {!!} -- TODO
+tracePrjToNe (∙snd pc) = {!!} -- TODO
+
+
+natEmbNf' : (pc : Prj e a)
+  → (n : Nf a b)
+  → wkTmPrj pc (embNf n) ≡ embNf (wkNfPrj pc n)
+
+-- naturality of embNf?
+natEmbNf : (w : e ⊆ a)
+  → (n : Nf a b)
+  → wkTm w (embNf n) ≡ embNf (wkNf w n)
+-- TODO
+
+-- naturality of embNe?
+natEmbNe : (w : e ⊆ a)
+  → (n : Ne a b)
+  → wkTm w (embNe n) ≡ embNe (wkNe w n)
+-- TODO
+
+-----------------
+-- Trace builder
+-----------------
+
 R : Tm a b → Val a b → Set
 R {a} {𝕓}      t x = t ⟶* quot x
 R {a} {𝟙}      t x = t ⟶* quot x
@@ -58,70 +140,28 @@ R-trace {b = 𝟙}     p = p
 R-trace {b = b ⇒ c} p = proj₁ p
 R-trace {b = b * c} p = proj₁ p
 
--- trace the weakening of terms
-traceWkTm : {t t' : Tm a b}
-  → (w : e ⊆ a)
-  → t ⟶* t'
-  → wkTm w t ⟶* wkTm w t'
-traceWkTm ⊆-refl   r = r
-traceWkTm (up-⊆ pc) r = cong-∙ r refl
-
 -- chain trace with a builder
 R-chain : {f g : Tm a b} {x : Val a b}
   → g ⟶* f
   → R f x
   → R g x
 R-chain {b = 𝕓} g⟶*f f⟶*x
-  = trans g⟶*f f⟶*x
+  = multi g⟶*f f⟶*x
 R-chain {b = 𝟙} g⟶*f f⟶*x
-  = trans g⟶*f f⟶*x
+  = multi g⟶*f f⟶*x
 R-chain {b = b ⇒ c} g⟶*f (f⟶*x , ss)
-  = trans g⟶*f f⟶*x
+  = multi g⟶*f f⟶*x
   , λ {u} {y} w uRy
-    → R-chain (cong-∙ refl (cong-pair (traceWkTm w g⟶*f) refl)) (ss w uRy)
+    → R-chain (cong-∙ refl (cong-pair (wkTm-pres-⟶* w g⟶*f) refl)) (ss w uRy)
 R-chain {b = b * c} g⟶*f (f⟶*x , sc1 , sc2)
-  = trans g⟶*f f⟶*x
+  = multi g⟶*f f⟶*x
   , R-chain (cong-∙ refl g⟶*f) sc1
   , R-chain (cong-∙ refl g⟶*f) sc2
 
 exp-apply∙ : {u : Tm a ((b ⇒ c) * b)}
     → apply ∙ u ⟶* apply ∙ pair (fst ∙ u) (snd ∙ u)
-exp-apply∙ = trans (cong-∙ (lift exp-apply) refl)
-  (trans (lift assoc) (cong-∙ refl (lift comp-pair)))
-
-
--- should really just be equal (≡) ?
-tracePrjToNe : (pc : Prj a b)
-  → (embPrjToTm pc) ⟶* (embNe (embPrjToNe pc))
-tracePrjToNe fst = refl
-tracePrjToNe snd = refl
-tracePrjToNe (∙fst pc) = {!!} -- TODO
-tracePrjToNe (∙snd pc) = {!!} -- TODO
-
-
--- TODO
-traceWkNfPrj : (n : Nf a b) (pc : Prj e a)
-  → (embNf n ∙ embPrjToTm pc) ⟶* embNf (wkNfPrj pc n)
-
---
-traceWkNePrj : (n : Ne a b) (pc : Prj e a)
-  → (embNe n ∙ embPrjToTm pc) ⟶* (embNe (wkNePrj pc n))
-traceWkNePrj id⇒ pc = trans (lift red-idl) (tracePrjToNe pc)
-traceWkNePrj fst pc = cong-∙ refl (tracePrjToNe pc)
-traceWkNePrj snd pc = cong-∙ refl (tracePrjToNe pc)
-traceWkNePrj (fst∙ n) pc = trans (lift assoc) (cong-∙ refl (traceWkNePrj n pc))
-traceWkNePrj (snd∙ n) pc = trans (lift assoc) (cong-∙ refl (traceWkNePrj n pc))
-traceWkNePrj (app∙pair n x) pc =
-  trans (lift assoc)
-    (cong-∙ refl (trans (lift comp-pair)
-    (cong-pair (traceWkNePrj n pc) (traceWkNfPrj x pc))))
-
--- naturality of embNe
-natEmbNe : (w : e ⊆ a)
-  → (n : Ne a b)
-  → wkTm w (embNe n) ⟶* embNe (wkNe w n)
-natEmbNe ⊆-refl    n = refl
-natEmbNe (up-⊆ pc) n = traceWkNePrj n pc
+exp-apply∙ = multi (cong-∙ (one exp-apply) refl)
+  (multi (one assoc) (cong-∙ refl (one comp-pair)))
 
 -- trace builder for reflection
 R-reflect : (n : Ne a b)
@@ -129,7 +169,7 @@ R-reflect : (n : Ne a b)
 R-reflect {b = 𝕓} n = refl
 R-reflect {b = 𝟙} n = refl
 R-reflect {b = b ⇒ c} n = refl , λ {_} {u} {v} w uRv
-  → R-chain (cong-∙ refl (cong-pair (natEmbNe w n) (R-trace uRv))) (R-reflect _)
+  → R-chain (cong-∙ refl (cong-pair (zero (natEmbNe w n)) (R-trace uRv))) (R-reflect _)
 R-reflect {b = b * c} n = refl , (R-reflect (fst∙ n) , R-reflect (snd∙ n))
 
 -- trace builder for identity
@@ -138,8 +178,8 @@ R-id {𝕓} = refl
 R-id {𝟙} = refl
 R-id {a * b}
   = refl
-  , R-chain (lift red-idr) (R-reflect fst)
-  , R-chain (lift red-idr) (R-reflect snd)
+  , R-chain (one red-idr) (R-reflect fst)
+  , R-chain (one red-idr) (R-reflect snd)
 R-id {a ⇒ b}
   = refl
   , λ {_} {u} {v} w uRv
@@ -149,7 +189,7 @@ R-id {a ⇒ b}
     R-w-id⇒ : (w : e ⊆ (a ⇒ b))
       → wkTm w id ⟶* embNe (⊆ToNe⇒ w)
     R-w-id⇒ ⊆-refl    = refl
-    R-w-id⇒ (up-⊆ pc) = trans (lift red-idl) (tracePrjToNe pc)
+    R-w-id⇒ (up-⊆ pc) = {!pc!} -- TODO
 
 -- trace builder for application
 R-apply∙ : {u : Tm e ((a ⇒ b) * a)} {v : Val e ((a ⇒ b) * a)}
@@ -166,5 +206,34 @@ R-pair : {t : Tm a b} {x : Val a b}
   → R (pair t u) (pair' x y)
 R-pair tRx uRy
   = (cong-pair (R-trace tRx) (R-trace uRy))
-  , (R-chain (lift red-fst) tRx)
-  , (R-chain (lift red-snd) uRy)
+  , (R-chain (one red-fst) tRx)
+  , (R-chain (one red-snd) uRy)
+
+-- weakening preserves R (weaken trace builder)
+wkPrj-pres-R : (pc : Prj e a)
+  → (t : Tm a b) (x : Val a b)
+  → R t x
+  → R (wkTmPrj pc t) (wkValPrj pc x)
+wkPrj-pres-R {b = 𝕓} pc t n tRx
+  = multi (wkTmPrj-pres-⟶* pc tRx) (zero (natEmbNf' pc n))
+wkPrj-pres-R {b = 𝟙} pc t n tRx
+  = multi (wkTmPrj-pres-⟶* pc tRx) (zero (natEmbNf' pc n))
+wkPrj-pres-R {b = b ⇒ c} pc t (n , f) (t⟶*x , ss)
+  = multi (wkTmPrj-pres-⟶* pc t⟶*x) (zero (natEmbNf' pc n))
+  , λ {_} {u} {v} w uRv → R-chain
+    (cong-∙ refl
+      (cong-pair
+        (zero (sym (wkTm-pres-∘ w (up-⊆ pc))))
+        refl))
+    (ss (up-⊆ pc ∘ w) uRv)
+wkPrj-pres-R {b = b * c} pc t (n , x , y) (t⟶*x , p , q)
+  = multi (wkTmPrj-pres-⟶* pc t⟶*x) (zero (natEmbNf' pc n))
+  , R-chain (zero (sym (wk-is-deep-∙ pc t))) (wkPrj-pres-R _ _ _ p)
+  , R-chain (zero (sym (wk-is-deep-∙ pc t))) (wkPrj-pres-R _ _ _ q)
+
+wk-pres-R : (w : e ⊆ a)
+  → (t : Tm a b) (x : Val a b)
+  → R t x
+  → R (wkTm w t) (wkVal w x)
+wk-pres-R ⊆-refl t x tRx   = tRx
+wk-pres-R (up-⊆ y) t x tRx = wkPrj-pres-R y t x tRx

@@ -186,6 +186,9 @@ a ⊆ b = a ≡ b ⊎ (Prj a b)
 ⊆-trans (inj₂ pc)   (inj₁ refl) = inj₂ pc
 ⊆-trans (inj₂ pc)   (inj₂ pc')  = inj₂ (Prj-trans pc pc')
 
+_∘_ : a ⊆ b → e ⊆ a → e ⊆ b
+x ∘ y = ⊆-trans y x
+
 -- weaken neutral elements
 wkNe : e ⊆ a → Ne a b → Ne e b
 wkNe (inj₁ refl) x = x

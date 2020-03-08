@@ -14,11 +14,6 @@ open import Data.Sum
 open import Relation.Binary.PropositionalEquality
   using (_≡_ ; refl; cong ; cong₂)
   renaming (trans to ≡-trans)
-open import Relation.Binary.Construct.Closure.ReflexiveTransitive
-  using (Star)
-  renaming (_◅◅_ to trans)
-
-open Star renaming (ε to refl)
 
 private
   variable

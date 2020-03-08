@@ -1,5 +1,7 @@
 module CCLBeta.CCL where
 
+open import Relation.Binary.PropositionalEquality
+  using (_≡_ ; refl)
 open import Relation.Binary.Construct.Closure.ReflexiveTransitive
   using (Star)
   renaming (_◅◅_ to trans)
@@ -91,6 +93,18 @@ lift : {t t' : Tm a b}
   → t ⟶ t'
   → t ⟶* t'
 lift p = p ◅ refl
+
+-- reduce in one step
+one   = lift
+
+-- reduce in zero steps
+zero : {t t' : Tm a b}
+  → t ≡ t'
+  → t ⟶* t'
+zero refl = refl
+
+-- reduce in multiple steps
+multi = trans
 
 cong-pair : {f f' : Tm a b} {g g' : Tm a c}
     → f ⟶* f'
