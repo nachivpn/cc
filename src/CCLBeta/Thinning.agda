@@ -175,6 +175,14 @@ wkNePrj pc (app∙pair n x) = app∙pair (wkNePrj pc n) (subNf (up≤ pc) x)
 _⊆_ : Ty → Ty → Set
 a ⊆ b = a ≡ b ⊎ (Prj a b)
 
+wkWith : {F : Ty → Ty → Set}
+  → ((pc : Prj e a) → F a b → F e b)
+  → e ⊆ a
+  → F a b
+  → F e b
+wkWith f (inj₁ refl) x = x
+wkWith f (inj₂ p)    x = f p x
+
 -- weakening relation is reflexive
 ⊆-refl : a ⊆ a
 ⊆-refl = inj₁ refl
@@ -191,10 +199,8 @@ x ∘ y = ⊆-trans y x
 
 -- weaken neutral elements
 wkNe : e ⊆ a → Ne a b → Ne e b
-wkNe (inj₁ refl) x = x
-wkNe (inj₂ pc)   x = wkNePrj pc x
+wkNe = wkWith {F = Ne} wkNePrj
 
 -- weaken normal forms
 wkNf : e ⊆ a → Nf a b → Nf e b
-wkNf (inj₁ refl) n = n
-wkNf (inj₂ pc)   n = wkNfPrj pc n
+wkNf = wkWith {F = Nf} wkNfPrj

@@ -46,8 +46,7 @@ wkValPrj {c = c * d} w (n , x , y)
 
 -- weaken a value
 wkVal : a' ⊆ a → Val a b → Val a' b
-wkVal (inj₁ refl) x = x
-wkVal (inj₂ w)   x = wkValPrj w x
+wkVal = wkWith {F = Val} wkValPrj
 
 -- embed thinning to Ne (only possible for arrow type)
 ⊆ToNe⇒ : e ⊆ (a ⇒ b) → Ne e (a ⇒ b)

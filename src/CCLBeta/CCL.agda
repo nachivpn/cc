@@ -5,6 +5,11 @@ open import Relation.Binary.PropositionalEquality
 open import Relation.Binary.Construct.Closure.ReflexiveTransitive
   using (Star)
   renaming (_◅◅_ to trans)
+open import Relation.Binary.Construct.Closure.Equivalence
+  using (EqClosure)
+  renaming (isEquivalence to EqClosureIsEquivalence)
+open import Data.Sum
+  using (inj₁ ; inj₂)
 
 open Star renaming (ε to refl)
 
@@ -14,7 +19,6 @@ data Ty : Set where
   𝕓        : Ty
   𝟙        : Ty
   _⇒_  _*_ : (a b : Ty) → Ty
-
 
 private
   variable
@@ -84,50 +88,6 @@ data _⟶_ : Tm a b → Tm a b → Set where
     → f ⟶ f'
     → curry f ⟶ curry f'
 
--- multi-step reduction
-_⟶*_ : Tm a b → Tm a b → Set
-_⟶*_ = Star (_⟶_)
-
--- embed ⟶ to ⟶*
-lift : {t t' : Tm a b}
-  → t ⟶ t'
-  → t ⟶* t'
-lift p = p ◅ refl
-
--- reduce in one step
-one   = lift
-
--- reduce in zero steps
-zero : {t t' : Tm a b}
-  → t ≡ t'
-  → t ⟶* t'
-zero refl = refl
-
--- reduce in multiple steps
-multi = trans
-
-cong-pair : {f f' : Tm a b} {g g' : Tm a c}
-    → f ⟶* f'
-    → g ⟶* g'
-    → (pair f g) ⟶* (pair f' g')
-cong-pair refl    refl    = refl
-cong-pair refl    (x ◅ q) = cong-pair2 x ◅ cong-pair refl q
-cong-pair (x ◅ p) q       = cong-pair1 x ◅ cong-pair p q
-
-cong-∙ : {f f' : Tm b c} {g g' : Tm a b}
-  → f ⟶* f'
-  → g ⟶* g'
-  → f ∙ g ⟶* f' ∙ g'
-cong-∙ refl    refl    = refl
-cong-∙ refl    (x ◅ q) = cong-∙2 x ◅ cong-∙ refl q
-cong-∙ (x ◅ p) q       = cong-∙1 x ◅ cong-∙ p q
-
-cong-∙curry* : {f f' : Tm (c * a) b}
-  → f ⟶* f'
-  → curry f ⟶* curry f'
-cong-∙curry* refl    = refl
-cong-∙curry* (x ◅ p) = cong-curry x ◅ cong-∙curry* p
-
 -- neutral elements
 data Ne : Ty → Ty → Set
 
@@ -168,3 +128,84 @@ embNf id*        = id
 embNf unit       = unit
 embNf (pair m n) = pair (embNf m) (embNf n)
 embNf (curry n)  = curry (embNf n)
+
+-- multi-step reduction
+_⟶*_ : Tm a b → Tm a b → Set
+_⟶*_ = Star (_⟶_)
+
+-- reduce in one step
+one : {t t' : Tm a b}
+  → t ⟶ t'
+  → t ⟶* t'
+one p = p ◅ refl
+
+-- reduce in zero steps
+zero : {t t' : Tm a b}
+  → t ≡ t'
+  → t ⟶* t'
+zero refl = refl
+
+-- reduce in multiple steps
+multi = trans
+
+cong-pair* : {f f' : Tm a b} {g g' : Tm a c}
+    → f ⟶* f'
+    → g ⟶* g'
+    → (pair f g) ⟶* (pair f' g')
+cong-pair* refl    refl    = refl
+cong-pair* refl    (x ◅ q) = cong-pair2 x ◅ cong-pair* refl q
+cong-pair* (x ◅ p) q       = cong-pair1 x ◅ cong-pair* p q
+
+cong-∙* : {f f' : Tm b c} {g g' : Tm a b}
+  → f ⟶* f'
+  → g ⟶* g'
+  → f ∙ g ⟶* f' ∙ g'
+cong-∙* refl    refl    = refl
+cong-∙* refl    (x ◅ q) = cong-∙2 x ◅ cong-∙* refl q
+cong-∙* (x ◅ p) q       = cong-∙1 x ◅ cong-∙* p q
+
+cong-curry* : {f f' : Tm (c * a) b}
+  → f ⟶* f'
+  → curry f ⟶* curry f'
+cong-curry* refl    = refl
+cong-curry* (x ◅ p) = cong-curry x ◅ cong-curry* p
+
+infix 3 _≈_
+
+-- conversion relation built from reduction steps,
+-- yields an equational theory for terms
+_≈_  : Tm a b → Tm a b → Set
+_≈_   = EqClosure _⟶_
+
+same : {t t' : Tm a b} → t ≡ t' → t ≈ t'
+same refl = refl
+
+reduces : {t t' : Tm a b}
+    → t ⟶ t'
+    → t ≈ t'
+reduces p = inj₁ p ◅ refl
+
+reduces* : {t t' : Tm a b}
+    → t ⟶* t'
+    → t ≈ t'
+reduces* refl = refl
+reduces* (x ◅ p) = inj₁ x ◅ reduces* p
+
+module SetoidUtil where
+
+  open import Relation.Binary
+    using (Setoid ; IsEquivalence)
+
+  open Setoid
+    renaming (_≈_ to _≈ₑ_)
+    using (Carrier ; isEquivalence)
+
+  -- Terms form a setoid
+  Tms : (a b : Ty) → Setoid _ _
+  Tms a b .Carrier       = Tm a b
+  Tms a b ._≈ₑ_          = _≈_
+  Tms a b .isEquivalence = EqClosureIsEquivalence _⟶_
+
+  open import Relation.Binary.SetoidReasoning public
+
+open SetoidUtil public
