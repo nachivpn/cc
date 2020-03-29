@@ -15,6 +15,9 @@ open import Data.Sum
 open import Relation.Binary.Construct.Closure.ReflexiveTransitive
   renaming (ε to refl ; _◅◅_ to trans)
 
+open import Function
+  using () renaming (_∘_ to _∘f_) -- function composition
+
 open SetoidUtil
 
 variable
@@ -82,7 +85,7 @@ wkTm-pres-id = refl
 
 embPrjToTm-squashes-∙ : {e' : Ty}
   → (x : Prj e' e) (y : Prj e a)
-  → embPrjToTm y ∙ embPrjToTm x  ≈ embPrjToTm (y ∘' x)
+  → embPrjToTm y ∙ embPrjToTm x  ≈ embPrjToTm (y ∘p x)
 embPrjToTm-squashes-∙ fst      y = refl
 embPrjToTm-squashes-∙ snd      y = refl
 embPrjToTm-squashes-∙ (∙fst x) y = trans
@@ -92,33 +95,31 @@ embPrjToTm-squashes-∙ (∙snd x) y = trans
   (sym (reduces assoc)) -- sym ALERT!
   (cong-∙ (embPrjToTm-squashes-∙ x y) refl)
 
-wkTmPrj-squashes-∙ : {e' : Ty} {t : Tm a b}
+wkTmPrj-squashes-∘f : {e' : Ty} {t : Tm a b}
   → (x : Prj e' e) (y : Prj e a)
- → wkTmPrj x (wkTmPrj y t) ≈ wkTmPrj (y ∘' x) t
-wkTmPrj-squashes-∙ fst y = reduces assoc
-wkTmPrj-squashes-∙ snd y = reduces assoc
-wkTmPrj-squashes-∙ {t = t} (∙fst x) y = begin⟨ Tms ⟩
+ → (wkTmPrj x ∘f wkTmPrj y) t ≈ wkTmPrj (y ∘p x) t
+wkTmPrj-squashes-∘f fst y = reduces assoc
+wkTmPrj-squashes-∘f snd y = reduces assoc
+wkTmPrj-squashes-∘f {t = t} (∙fst x) y = begin⟨ Tms ⟩
   wkTmPrj (∙fst x) (wkTmPrj y t)            ≈⟨ refl ⟩ -- i.e., by definition of wkTmPrj
   (t ∙ embPrjToTm y) ∙ embPrjToTm x ∙ fst   ≈⟨ reduces assoc ⟩
   t ∙ (embPrjToTm y ∙ embPrjToTm x ∙ fst)   ≈⟨ cong-∙ refl (sym (reduces assoc)) ⟩ -- sym ALERT!
   t ∙ ((embPrjToTm y ∙ embPrjToTm x) ∙ fst) ≈⟨ cong-∙ refl (cong-∙ (embPrjToTm-squashes-∙ x y) refl) ⟩
-  t ∙ embPrjToTm (y ∘' x) ∙ fst             ≈⟨ refl ⟩  -- i.e., by definition of wkTmPrj
-  wkTmPrj (y ∘' ∙fst x) t                    ∎
-
-wkTmPrj-squashes-∙ {t = t}  (∙snd x) y = begin⟨ Tms ⟩
-  -- same as above, omitting details
+  t ∙ embPrjToTm (y ∘p x) ∙ fst             ≈⟨ refl ⟩  -- i.e., by definition of wkTmPrj
+  wkTmPrj (y ∘p ∙fst x) t                    ∎
+wkTmPrj-squashes-∘f {t = t}  (∙snd x) y = begin⟨ Tms ⟩ -- same as above, omitting details
   wkTmPrj (∙snd x) (wkTmPrj y t)  ≈⟨ reduces assoc ⟩
   _                               ≈⟨ cong-∙ refl (sym (reduces assoc)) ⟩ -- sym ALERT!
   _                               ≈⟨ cong-∙ refl (cong-∙ (embPrjToTm-squashes-∙ x y) refl) ⟩
-  wkTmPrj (y ∘' ∙snd x) t          ∎
+  wkTmPrj (y ∘p ∙snd x) t          ∎
 
-wkTm-squashes-∙ : {e' : Ty} {t : Tm a b}
+wkTm-squashes-∘f : {e' : Ty} {t : Tm a b}
     → (w : e' ⊆ e) (w' : e ⊆ a)
-    → wkTm w (wkTm w' t) ≈ wkTm (w' ∘ w) t
-wkTm-squashes-∙ refl   refl = refl
-wkTm-squashes-∙ (up x) refl = refl
-wkTm-squashes-∙ refl   (up x) = refl
-wkTm-squashes-∙ (up x) (up y) = wkTmPrj-squashes-∙ x y
+    → (wkTm w ∘f wkTm w') t ≈ wkTm (w' ∘w w) t
+wkTm-squashes-∘f refl   refl = refl
+wkTm-squashes-∘f (up x) refl = refl
+wkTm-squashes-∘f refl   (up x) = refl
+wkTm-squashes-∘f (up x) (up y) = wkTmPrj-squashes-∘f x y
 
 postulate
 
@@ -152,7 +153,7 @@ wkRPrj {b = 𝟙} pc t n t≈n
 wkRPrj {b = b ⇒ c} pc t (n , _ ) (t≈n , ss)
   = wkBySubLem pc t n t≈n
   , λ {_} {u} {y} w uRy → R-chain
-      (cong-∙ refl (cong-pair (wkTm-squashes-∙ w (up pc)) refl))
+      (cong-∙ refl (cong-pair (wkTm-squashes-∘f w (up pc)) refl))
       (ss (⊆-trans w (up pc)) uRy)
 wkRPrj {b = b * c} pc t (n , x , y) (t≈n , fsttRx , sndtRy)
   = wkBySubLem pc t n t≈n

@@ -37,8 +37,9 @@ Prj-trans snd pc' = ∙snd pc'
 Prj-trans (∙fst pc) pc' = ∙fst (Prj-trans pc pc')
 Prj-trans (∙snd pc) pc' = ∙snd (Prj-trans pc pc')
 
-_∘'_ : Prj a b → Prj e a → Prj e b
-x ∘' y = Prj-trans y x
+-- projection composition
+_∘p_ : Prj a b → Prj e a → Prj e b
+x ∘p y = Prj-trans y x
 
 -- `Entry a b c` represents single constructor (Ne a b → Ne a c)
 data Entry (i : Ty) : Ty → Ty → Set where
@@ -194,8 +195,9 @@ wkWith f (up p) x = f p x
 ⊆-trans (up pc) refl     = up pc
 ⊆-trans (up pc) (up pc') = up (Prj-trans pc pc')
 
-_∘_ : a ⊆ b → e ⊆ a → e ⊆ b
-x ∘ y = ⊆-trans y x
+-- weakening composition
+_∘w_ : a ⊆ b → e ⊆ a → e ⊆ b
+x ∘w y = ⊆-trans y x
 
 -- weaken neutral elements
 wkNe : e ⊆ a → Ne a b → Ne e b
