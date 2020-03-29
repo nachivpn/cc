@@ -37,6 +37,9 @@ Prj-trans snd pc' = ∙snd pc'
 Prj-trans (∙fst pc) pc' = ∙fst (Prj-trans pc pc')
 Prj-trans (∙snd pc) pc' = ∙snd (Prj-trans pc pc')
 
+_∘'_ : Prj a b → Prj e a → Prj e b
+x ∘' y = Prj-trans y x
+
 -- `Entry a b c` represents single constructor (Ne a b → Ne a c)
 data Entry (i : Ty) : Ty → Ty → Set where
   fst∙□    : Entry i (a * b) a
@@ -79,25 +82,25 @@ embPrjToNe (∙fst pc) = plugNe (genSpine pc) fst
 embPrjToNe (∙snd pc) = plugNe (genSpine pc) snd
 
 -- "substitution" of projections
--- analogous to a substituion made up of only variables
+-- analogous to a substitution made up of only variables
 data PSub : Ty → Ty → Set where
-  up≤  : Prj a b → PSub a b
+  up  : Prj a b → PSub a b
   pair : PSub d a → PSub d b → PSub d (a * b)
 
 -- embed substitution into terms
 embPSubToTm : PSub a b → Tm a b
-embPSubToTm (up≤ x) = embPrjToTm x
+embPSubToTm (up x) = embPrjToTm x
 embPSubToTm (pair s s') = pair (embPSubToTm s) (embPSubToTm s')
 
 -- substitutions admit "drop"
 drop : PSub a b → PSub (a * c) b
-drop (up≤ pc)    = up≤ (∙fst pc)
+drop (up pc)    = up (∙fst pc)
 drop (pair s s') = pair (drop s) (drop s')
 
 -- substitutions admit "keep"
 keep : PSub a b → PSub (a * c) (b * c)
-keep (up≤ pc)      = pair (up≤ (∙fst pc)) (up≤ snd)
-keep (pair s s') = pair (pair (drop s) (drop s')) (up≤ snd)
+keep (up pc)      = pair (up (∙fst pc)) (up snd)
+keep (pair s s') = pair (pair (drop s) (drop s')) (up snd)
 
 -- "neutral pairs" are normal forms that result
 -- from applying a substitution to a neutral
@@ -112,7 +115,7 @@ embNpToNf (pair s s') = pair (embNpToNf s) (embNpToNf s')
 
 -- translate substitutions into neutral pairs
 subToNp : PSub a b → Np a b
-subToNp (up≤ x)     = up (embPrjToNe x)
+subToNp (up x)     = up (embPrjToNe x)
 subToNp (pair s s') = pair (subToNp s) (subToNp s')
 
 -- translate substitutions into normal forms
@@ -159,7 +162,7 @@ subNf s (up x)     = subNe s x
 -- pre-compose a projection to normal form
 -- i.e., weaken a normal form (strictly)
 wkNfPrj : Prj a b → Nf b c → Nf a c
-wkNfPrj pc n = subNf (up≤ pc) n
+wkNfPrj pc n = subNf (up pc) n
 
 -- pre-compose a projection to neutral elements
 -- i.e., weaken a neutral element (strictly)
@@ -169,30 +172,27 @@ wkNePrj pc fst      = fst∙ (embPrjToNe pc)
 wkNePrj pc snd      = snd∙ (embPrjToNe pc)
 wkNePrj pc (fst∙ n) = fst∙ (wkNePrj pc n)
 wkNePrj pc (snd∙ n) = snd∙ (wkNePrj pc n)
-wkNePrj pc (app∙pair n x) = app∙pair (wkNePrj pc n) (subNf (up≤ pc) x)
+wkNePrj pc (app∙pair n x) = app∙pair (wkNePrj pc n) (subNf (up pc) x)
 
--- weakening relation (or "thinnings")
-_⊆_ : Ty → Ty → Set
-a ⊆ b = a ≡ b ⊎ (Prj a b)
+-- reflexive closure of projections
+data _⊆_ : Ty → Ty → Set where
+  refl  : a ⊆ a
+  up    : Prj a b → a ⊆ b
 
 wkWith : {F : Ty → Ty → Set}
-  → ((pc : Prj e a) → F a b → F e b)
+  → ({e a : Ty} (pc : Prj e a) → F a b → F e b)
   → e ⊆ a
   → F a b
   → F e b
-wkWith f (inj₁ refl) x = x
-wkWith f (inj₂ p)    x = f p x
-
--- weakening relation is reflexive
-⊆-refl : a ⊆ a
-⊆-refl = inj₁ refl
+wkWith f refl   x = x
+wkWith f (up p) x = f p x
 
 -- weakening relation is transitive
 ⊆-trans : e ⊆ a → a ⊆ b → e ⊆ b
-⊆-trans (inj₁ refl) (inj₁ refl) = inj₁ refl
-⊆-trans (inj₁ refl) (inj₂ pc)   = inj₂ pc
-⊆-trans (inj₂ pc)   (inj₁ refl) = inj₂ pc
-⊆-trans (inj₂ pc)   (inj₂ pc')  = inj₂ (Prj-trans pc pc')
+⊆-trans refl    refl     = refl
+⊆-trans refl    (up pc)  = up pc
+⊆-trans (up pc) refl     = up pc
+⊆-trans (up pc) (up pc') = up (Prj-trans pc pc')
 
 _∘_ : a ⊆ b → e ⊆ a → e ⊆ b
 x ∘ y = ⊆-trans y x
@@ -204,3 +204,11 @@ wkNe = wkWith {F = Ne} wkNePrj
 -- weaken normal forms
 wkNf : e ⊆ a → Nf a b → Nf e b
 wkNf = wkWith {F = Nf} wkNfPrj
+
+-- weaken term with a projection
+wkTmPrj : Prj e a → Tm a b → Tm e b
+wkTmPrj pc t = t ∙ embPrjToTm pc
+
+-- weaken terms
+wkTm : e ⊆ a → Tm a b → Tm e b
+wkTm = wkWith {F = Tm} wkTmPrj

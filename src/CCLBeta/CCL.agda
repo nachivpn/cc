@@ -6,7 +6,7 @@ open import Relation.Binary.Construct.Closure.ReflexiveTransitive
   using (Star)
   renaming (_◅◅_ to trans)
 open import Relation.Binary.Construct.Closure.Equivalence
-  using (EqClosure)
+  using (EqClosure ; symmetric)
   renaming (isEquivalence to EqClosureIsEquivalence)
 open import Data.Sum
   using (inj₁ ; inj₂)
@@ -84,7 +84,7 @@ data _⟶_ : Tm a b → Tm a b → Set where
     → g ⟶ g'
     → f ∙ g ⟶ f ∙ g'
 
-  cong-curry : {f f' : Tm (c * a) b}
+  cong-curry' : {f f' : Tm (c * a) b}
     → f ⟶ f'
     → curry f ⟶ curry f'
 
@@ -168,7 +168,7 @@ cong-curry* : {f f' : Tm (c * a) b}
   → f ⟶* f'
   → curry f ⟶* curry f'
 cong-curry* refl    = refl
-cong-curry* (x ◅ p) = cong-curry x ◅ cong-curry* p
+cong-curry* (x ◅ p) = cong-curry' x ◅ cong-curry* p
 
 infix 3 _≈_
 
@@ -176,6 +176,9 @@ infix 3 _≈_
 -- yields an equational theory for terms
 _≈_  : Tm a b → Tm a b → Set
 _≈_   = EqClosure _⟶_
+
+sym : {t t' : Tm a b} → t ≈ t' → t' ≈ t
+sym = symmetric _⟶_
 
 same : {t t' : Tm a b} → t ≡ t' → t ≈ t'
 same refl = refl
@@ -191,6 +194,21 @@ reduces* : {t t' : Tm a b}
 reduces* refl = refl
 reduces* (x ◅ p) = inj₁ x ◅ reduces* p
 
+postulate
+  cong-pair : {f f' : Tm a b} {g g' : Tm a c}
+    → f ≈ f'
+    → g ≈ g'
+    → (pair f g) ≈ (pair f' g')
+
+  cong-∙ : {f f' : Tm b c} {g g' : Tm a b}
+    → f ≈ f'
+    → g ≈ g'
+    → f ∙ g ≈ f' ∙ g'
+
+  cong-curry : {f f' : Tm (c * a) b}
+    → f ≈ f'
+    → curry f ≈ curry f'
+
 module SetoidUtil where
 
   open import Relation.Binary
@@ -201,10 +219,10 @@ module SetoidUtil where
     using (Carrier ; isEquivalence)
 
   -- Terms form a setoid
-  Tms : (a b : Ty) → Setoid _ _
-  Tms a b .Carrier       = Tm a b
-  Tms a b ._≈ₑ_          = _≈_
-  Tms a b .isEquivalence = EqClosureIsEquivalence _⟶_
+  Tms : {a b : Ty} → Setoid _ _
+  Tms {a} {b} .Carrier       = Tm a b
+  Tms {a} {b} ._≈ₑ_          = _≈_
+  Tms {a} {b} .isEquivalence = EqClosureIsEquivalence _⟶_
 
   open import Relation.Binary.SetoidReasoning public
 

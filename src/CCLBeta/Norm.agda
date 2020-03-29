@@ -40,7 +40,7 @@ wkValPrj {c = 𝕓} w v
 wkValPrj {c = 𝟙} w v
   = wkNfPrj w v
 wkValPrj {c = c ⇒ d} w (n , f)
-  = wkNfPrj w n , λ w' x → f (⊆-trans w' (inj₂ w)) x
+  = wkNfPrj w n , λ w' x → f (⊆-trans w' (up w)) x
 wkValPrj {c = c * d} w (n , x , y)
   = wkNfPrj w n  , wkValPrj w x , wkValPrj w y
 
@@ -50,8 +50,8 @@ wkVal = wkWith {F = Val} wkValPrj
 
 -- embed thinning to Ne (only possible for arrow type)
 ⊆ToNe⇒ : e ⊆ (a ⇒ b) → Ne e (a ⇒ b)
-⊆ToNe⇒ (inj₁ refl) = id⇒
-⊆ToNe⇒ (inj₂ y)    = embPrjToNe y
+⊆ToNe⇒ refl   = id⇒
+⊆ToNe⇒ (up y) = embPrjToNe y
 
 -- from semantics to normal forms
 reify : Val e a → Nf e a
@@ -80,8 +80,8 @@ id' {a * b} = id* , reflect fst , reflect snd
 
 -- projections are values (since they can be reflected)
 ⊆ToVal : e ⊆ a → Val e a
-⊆ToVal (inj₁ refl) = id'
-⊆ToVal (inj₂ pc)   = reflect (embPrjToNe pc)
+⊆ToVal refl    = id'
+⊆ToVal (up pc) = reflect (embPrjToNe pc)
 
 app : Val a (b ⇒ c) → ({e : Ty} → e ⊆ a → Val e b → Val e c)
 app x = proj₂ x
@@ -96,7 +96,7 @@ snd∙' (_ , _ , x) = x
 
 -- semantic application composition
 apply∙' : Val a ((b ⇒ c) * b) → Val a c
-apply∙' (_ , f , x) = app f ⊆-refl x
+apply∙' (_ , f , x) = app f refl x
 
 -- semantic pairing
 pair' : Val a b → Val a c → Val a (b * c)
@@ -115,7 +115,7 @@ eval∙ (pair t u) x
   , (eval∙ t x)
   , (eval∙ u x)
 eval∙ (curry t) x
-  = curry (reify (eval∙ t (pair' (wkVal (inj₂ fst) x) (reflect snd))))
+  = curry (reify (eval∙ t (pair' (wkVal (up fst) x) (reflect snd))))
   , λ w y → eval∙ t (pair' (wkVal w x) y)
 
 -- interpretation of terms

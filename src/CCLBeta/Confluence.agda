@@ -67,3 +67,17 @@ notConfluent : ¬ Confluent
 notConfluent confluent = dontConvergeEx (confluent (curry id ∙ id)
   (one red-idr)     -- curry id ∙ id ⟶ curry id
   (one comp-curry)) -- curry id ∙ id ⟶ curry (id ∙ pair (id ∙ fst) snd)
+
+-- Def. of soundness of interpretation (eval)
+Soundness : Set
+Soundness = {a b : Ty} (t t' : Tm a b)
+  → t ⟶ t' → eval t ≡ eval t'
+
+-- Example of terms that are interpreted differently
+diffInterp : eval (curry (id {𝕓 * 𝕓}) ∙ id) ≢ eval (curry id)
+diffInterp ()
+
+-- Interpretation of CCLBeta is not sound
+notSound : ¬ Soundness
+notSound sound = diffInterp ((sound
+  (curry id ∙ id) (curry id) red-idr))
