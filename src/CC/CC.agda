@@ -49,12 +49,12 @@ eval (var x)    = x ∙_
 eval id         = λ z → z
 eval (t ∙ u)    = λ x → eval t (eval u x)
 
-reify : 𝒩 a b → Tm a b
-reify id      = id
-reify (x ∙ t) = var x ∙ reify t
+rf : 𝒩 a b → Tm a b
+rf id      = id
+rf (x ∙ t) = var x ∙ rf t
 
 quot : ⟦ a ⟧→̇⟦ b ⟧ → Tm a b
-quot f = reify (f id)
+quot f = rf (f id)
 
 norm : Tm a b → Tm a b
 norm t = quot (eval t)
