@@ -1,4 +1,4 @@
-module CC.CC (Node : Set) (Var : Node → Node → Set) where
+module CC.CC (Node : Set) (Edge : Node → Node → Set) where
 
 -- Reference: I Beylin and P Dybjer (1995)
 
@@ -18,7 +18,7 @@ private
 infixr 4 _∙_
 
 data Tm : (a b : Ty) → Set where
-  var   : Var a b → Tm a b
+  var   : Edge a b → Tm a b
   id    : Tm a a
   _∙_   : Tm b c → Tm a b → Tm a c
 
@@ -41,7 +41,7 @@ _≈_   = EqClosure _∼_
 
 data 𝒩 : (a b : Ty) → Set where
   id      : 𝒩 a a
-  var⟨_⟩∙_ : Var b c → 𝒩 a b → 𝒩 a c
+  var⟨_⟩∙_ : Edge b c → 𝒩 a b → 𝒩 a c
 
 Tm' : Ty → Ty → Set
 Tm' a b  = 𝒩 a b
