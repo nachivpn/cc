@@ -51,8 +51,8 @@ Tm' a b  = 𝒩 a b
 
 eval : Tm a b → ⟦ a ⟧→̇⟦ b ⟧
 eval (var x)    = x ∙_
-eval id         = λ z → z
-eval (t ∙ u)    = λ x → eval t (eval u x)
+eval id         = idf
+eval (t ∙ u)    = (eval t) ∘f (eval u)
 
 emb𝒩 : 𝒩 a b → Tm a b
 emb𝒩 id      = id
