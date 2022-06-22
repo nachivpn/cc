@@ -1,10 +1,15 @@
-module CC.CC (Ty : Set) (Var : Ty → Ty → Set) where
+module CC.CC (Node : Set) (Var : Node → Node → Set) where
 
 -- Reference: I Beylin and P Dybjer (1995)
 
 open import Relation.Binary.Construct.Closure.Equivalence
   using (EqClosure ; symmetric)
   renaming (isEquivalence to EqClosureIsEquivalence)
+open import Function
+  using ()
+  renaming (id to idf ; _∘_ to _∘f_)
+
+Ty = Node
 
 private
   variable
@@ -49,12 +54,12 @@ eval (var x)    = x ∙_
 eval id         = λ z → z
 eval (t ∙ u)    = λ x → eval t (eval u x)
 
-rf : 𝒩 a b → Tm a b
-rf id      = id
-rf (x ∙ t) = var x ∙ rf t
+emb𝒩 : 𝒩 a b → Tm a b
+emb𝒩 id      = id
+emb𝒩 (x ∙ t) = var x ∙ emb𝒩 t
 
 quot : ⟦ a ⟧→̇⟦ b ⟧ → Tm a b
-quot f = rf (f id)
+quot f = emb𝒩 (f id)
 
 norm : Tm a b → Tm a b
 norm t = quot (eval t)
