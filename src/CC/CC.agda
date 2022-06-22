@@ -40,8 +40,8 @@ _≈_   = EqClosure _∼_
 -- are given by `Ty` and edges are given by `Var`
 
 data 𝒩 : (a b : Ty) → Set where
-  id    : 𝒩 a a
-  _∙_   : Var b c → 𝒩 a b → 𝒩 a c
+  id      : 𝒩 a a
+  var⟨_⟩∙_ : Var b c → 𝒩 a b → 𝒩 a c
 
 Tm' : Ty → Ty → Set
 Tm' a b  = 𝒩 a b
@@ -50,13 +50,13 @@ Tm' a b  = 𝒩 a b
 ⟦ a ⟧→̇⟦ b ⟧ = {c : Ty} → (Tm' c a → Tm' c b)
 
 eval : Tm a b → ⟦ a ⟧→̇⟦ b ⟧
-eval (var x)    = x ∙_
+eval (var x)    = var⟨ x ⟩∙_
 eval id         = idf
 eval (t ∙ u)    = (eval t) ∘f (eval u)
 
 emb𝒩 : 𝒩 a b → Tm a b
-emb𝒩 id      = id
-emb𝒩 (x ∙ t) = var x ∙ emb𝒩 t
+emb𝒩 id           = id
+emb𝒩 (var⟨ x ⟩∙ t) = var x ∙ emb𝒩 t
 
 quot : ⟦ a ⟧→̇⟦ b ⟧ → Tm a b
 quot f = emb𝒩 (f id)
