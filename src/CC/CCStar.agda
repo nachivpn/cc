@@ -3,13 +3,18 @@ module CC.CCStar (Node : Set) (Edge : Node → Node → Set) where
 open import Relation.Binary.Construct.Closure.Equivalence
   using (EqClosure ; symmetric)
   renaming (isEquivalence to EqClosureIsEquivalence)
-open import Data.Product using (_×_ ; _,_ ; proj₁ ; proj₂ ; <_,_>)
+
+open import Data.Unit
+  using (⊤ ; tt)
+open import Data.Product
+  using (_×_ ; _,_ ; proj₁ ; proj₂ ; <_,_>)
 open import Function
   using ()
-  renaming (id to idf ; _∘_ to _∘f_)
+  renaming (id to idf ; _∘_ to _∘f_ ; const to constf)
 
 data Ty : Set where
   𝕘   : Node → Ty
+  𝟙   : Ty
   _*_ : Ty → Ty → Ty
 
 private
@@ -23,6 +28,7 @@ data Tm : (a b : Ty) → Set where
   var   : Edge p q → Tm (𝕘 p) (𝕘 q)
   id    : Tm a a
   _∙_   : Tm b c → Tm a b → Tm a c
+  unit  : Tm a 𝟙
   fst   : Tm (a * b) a
   snd   : Tm (a * b) b
   pair  : Tm a b → Tm a c → Tm a (b * c)
@@ -37,6 +43,7 @@ data _∼_ : Tm a b → Tm a b → Set where
   idl-∼         : id ∙ f ∼ f
   idr-∼         : f ∼ f ∙ id
   assoc-∼       : (f ∙ g) ∙ h ∼ f ∙ (g ∙ h)
+  unit-∼        : f ∼ unit
   fst-pair-∼    : fst ∙ pair f g ∼ f
   snd-pair-∼    : snd ∙ pair f g ∼ f
   pair-fst-snd∼ : f ∼ pair (fst ∙ f) (snd ∙ f)
@@ -46,16 +53,18 @@ _≈_ = EqClosure _∼_
 
 data 𝒩 : (a b : Ty) → Set where
   id       : 𝒩 a a
-  fst∙     : 𝒩 a (b * c) → 𝒩 a b
-  snd∙     : 𝒩 a (b * c) → 𝒩 a c
+  fst∙_    : 𝒩 a (b * c) → 𝒩 a b
+  snd∙_    : 𝒩 a (b * c) → 𝒩 a c
   var⟨_⟩∙_ : Edge p q → 𝒩 a (𝕘 p) → 𝒩 a (𝕘 q)
 
 data ℳ : (a b : Ty) → Set where
   up   : 𝒩 a (𝕘 p) → ℳ a (𝕘 p)
+  unit : ℳ a 𝟙
   pair : ℳ a b → ℳ a c → ℳ a (b * c)
 
 Tm' : Ty → Ty → Set
 Tm' a (𝕘 p)   = 𝒩 a (𝕘 p)
+Tm' a 𝟙       = ⊤
 Tm' a (b * c) = Tm' a b × Tm' a c
 
 ⟦_⟧→̇⟦_⟧ : Ty → Ty → Set
@@ -65,16 +74,19 @@ eval : Tm a b → ⟦ a ⟧→̇⟦ b ⟧
 eval (var x)    = var⟨ x ⟩∙_
 eval id         = idf
 eval (t ∙ u)    = (eval t) ∘f (eval u)
+eval unit       = constf tt
 eval fst        = proj₁
 eval snd        = proj₂
 eval (pair t u) = < eval t , eval u >
 
 reflect : 𝒩 a b → Tm' a b
 reflect {b = 𝕘 x}    n = n
+reflect {b = 𝟙}      n = tt
 reflect {b = b * c}  n = reflect (fst∙ n) , reflect (snd∙ n)
 
 reify : Tm' a b → ℳ a b
 reify {b = 𝕘 x}   z = up z
+reify {b = 𝟙}     z = unit
 reify {b = b * c} z = pair (reify (proj₁ z)) (reify (proj₂ z))
 
 emb𝒩 : 𝒩 a b → Tm a b
@@ -85,6 +97,7 @@ emb𝒩 (var⟨ x ⟩∙ m) = var x ∙ emb𝒩 m
 
 embℳ : ℳ a b → Tm a b
 embℳ (up n)      = emb𝒩 n
+embℳ unit        = unit
 embℳ (pair m m') = pair (embℳ m) (embℳ m')
 
 quot : ⟦ a ⟧→̇⟦ b ⟧ → Tm a b
