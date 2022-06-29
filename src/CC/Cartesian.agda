@@ -1,4 +1,4 @@
-module CC.CCStar (Node : Set) (Edge : Node → Node → Set) where
+module CC.Cartesian (Node : Set) (Edge : Node → Node → Set) where
 
 open import Relation.Binary.Construct.Closure.Equivalence
   using (EqClosure ; symmetric)

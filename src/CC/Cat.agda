@@ -1,4 +1,4 @@
-module CC.CC (Node : Set) (Edge : Node → Node → Set) where
+module CC.Cat (Node : Set) (Edge : Node → Node → Set) where
 
 -- Reference: I Beylin and P Dybjer (1995)
 
